@@ -3,7 +3,7 @@
 from langchain.agents import Tool
 from langchain.agents import initialize_agent
 
-from adapters.jira_api import JiraAPI, JiraConfig
+from src.adapters.jira_api import JiraAPI, JiraConfig
 from llm.llm_wrapper import get_llm
 import config
 
