@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional, List
 
-from adapters.jira_api import JiraAPI, JiraConfig
+from src.adapters.jira_api import JiraAPI, JiraConfig
 from models.jira_models import Comment, Issue
 import config
 
