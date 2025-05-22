@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Optional, List
 
 from src.adapters.jira_api import JiraAPI, JiraConfig
+import requests
 from src.models.jira_models import Comment, Issue
 import config
 
@@ -19,7 +20,13 @@ class JiraService:
 
     def fetch_issue(self, issue_key: str) -> Issue:
         """Return an :class:`Issue` model populated from Jira."""
-        data = self._api.get_issue(issue_key)
+        try:
+            data = self._api.get_issue(issue_key)
+        except requests.HTTPError as exc:
+            # Provide a more friendly error message when authentication fails
+            raise RuntimeError(
+                f"Failed to fetch issue {issue_key}: {exc}"
+            ) from exc
         fields = data.get("fields", {})
         comments: List[Comment] = []
         comment_data = fields.get("comment", {}).get("comments", [])

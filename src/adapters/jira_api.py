@@ -5,13 +5,20 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List
 
+import base64
 import requests
 
 logger = logging.getLogger(__name__)
 
 
-def _build_auth_headers(api_token: str) -> Dict[str, str]:
-    return {"Authorization": f"Bearer {api_token}", "Accept": "application/json", "Content-Type": "application/json"}
+def _build_auth_headers(username: str, api_token: str) -> Dict[str, str]:
+    """Return headers for Jira basic auth using an API token."""
+    token = base64.b64encode(f"{username}:{api_token}".encode()).decode()
+    return {
+        "Authorization": f"Basic {token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
 
 
 @dataclass
@@ -27,7 +34,11 @@ class JiraAPI:
     def __init__(self, config: JiraConfig):
         self.config = config
         self.session = requests.Session()
-        self.session.headers.update(_build_auth_headers(config.api_token))
+        # Normalize base URL to avoid double slashes
+        self.config.base_url = self.config.base_url.rstrip("/")
+        self.session.headers.update(
+            _build_auth_headers(config.username, config.api_token)
+        )
 
     def get_issue(self, issue_key: str) -> Dict[str, Any]:
         url = f"{self.config.base_url}/rest/api/3/issue/{issue_key}"

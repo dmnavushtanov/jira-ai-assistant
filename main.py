@@ -10,7 +10,12 @@ def main() -> None:
         return
 
     service = JiraService()
-    description = service.get_issue_description(issue_key)
+    try:
+        description = service.get_issue_description(issue_key)
+    except RuntimeError as exc:
+        print(exc)
+        return
+
     if description:
         print(f"Description for {issue_key}:\n{description}")
     else:
