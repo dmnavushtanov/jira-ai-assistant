@@ -1,15 +1,49 @@
 # Jira AI Assistant
 
-This project provides a command line assistant that interacts with Jira.
+An AI-powered assistant for interacting with Jira using natural language.
 
-Phase 1 implemented a basic project scaffold with a minimal REST adapter and a Typer CLI.
+## Installation
 
-Phase 2 introduces a simple LangChain agent. The agent wraps the LLM through ``src.llm.llm_wrapper`` and exposes tools for describing, searching and transitioning Jira issues.
+1. Clone the repository:
+   ```
+   git clone <your-repository-url>
+   cd jira-assistant
+   ```
 
-Phase 3 adds a YAML based configuration under ``src/config/criteria.yaml`` and a ``HotReloader`` utility to automatically reload files when they change.
+2. Install the package in development mode:
+   ```
+   pip install -e .
+   ```
 
-Phase 4 introduces ``OpenAIService`` which loads your API key and model from ``config.py`` and provides a light wrapper around the OpenAI response API used by the agent.
+3. Create a `.env` file in the project root with your credentials:
+   ```
+   JIRA_URL=https://your-domain.atlassian.net/
+   OPENAI_API_KEY=your_openai_api_key
+   JIRA_USERNAME=your.email@example.com
+   JIRA_API_TOKEN=your_jira_api_token
+   OPENAI_MODEL=gpt-3.5-turbo
+   ```
+
+4. Verify your environment configuration:
+   ```
+   python check_env.py
+   ```
+
+## Usage
+
+Use the CLI to interact with Jira:
 
 ```
-python -m src.cli.main hello
+python main.py hello
 ```
+
+## Project Structure
+
+- `adapters/`: Low-level API clients
+- `agents/`: LLM-powered agents
+- `cli/`: Command-line interface
+- `config/`: Configuration files
+- `core/`: Core utilities
+- `llm/`: LLM wrappers
+- `models/`: Data models
+- `services/`: Business logic services

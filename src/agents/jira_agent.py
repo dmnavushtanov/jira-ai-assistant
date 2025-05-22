@@ -4,7 +4,7 @@ from langchain.agents import Tool
 from langchain.agents import initialize_agent
 
 from src.adapters.jira_api import JiraAPI, JiraConfig
-from llm.llm_wrapper import get_llm
+from src.llm.llm_wrapper import get_llm
 import config
 
 jira_client = JiraAPI(JiraConfig(config.JIRA_URL, config.JIRA_USERNAME, config.JIRA_API_TOKEN))
