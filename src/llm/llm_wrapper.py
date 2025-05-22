@@ -1,22 +1,18 @@
-"""Simple wrapper to allow pluggable LLMs used by the agent."""
+"""Simple wrapper over :class:`OpenAIService` used by the agent."""
 
-from typing import Any, Dict
+from typing import Any
 
-from langchain.llms import OpenAI
-
-import config
+from .openai_service import get_service
 
 
 class LLMWrapper:
-    """Thin wrapper around the LangChain LLM interface."""
+    """Thin wrapper exposing the OpenAI service via a simple ``__call__``."""
 
-    def __init__(self, **kwargs: Any) -> None:
-        params: Dict[str, Any] = {"api_key": config.OPENAI_API_KEY}
-        params.update(kwargs)
-        self.llm = OpenAI(**params)
+    def __init__(self, **_: Any) -> None:
+        self.service = get_service()
 
     def __call__(self, prompt: str) -> str:
-        return self.llm(prompt)
+        return self.service(prompt)
 
 
 def get_llm(**kwargs: Any):
