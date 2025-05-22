@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 import requests
 
@@ -42,4 +42,22 @@ class JiraAPI:
         logger.debug("Transitioning issue %s with payload %s", issue_key, payload)
         resp = self.session.post(url, json=payload)
         resp.raise_for_status()
+
+    def search_issues(self, jql: str) -> List[Dict[str, Any]]:
+        """Return issues matching the JQL query."""
+        url = f"{self.config.base_url}/rest/api/3/search"
+        logger.debug("Searching issues with JQL: %s", jql)
+        resp = self.session.get(url, params={"jql": jql})
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("issues", [])
+
+    def get_transitions(self, issue_key: str) -> List[Dict[str, Any]]:
+        """Fetch available transitions for an issue."""
+        url = f"{self.config.base_url}/rest/api/3/issue/{issue_key}/transitions"
+        logger.debug("Fetching transitions for issue %s", issue_key)
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("transitions", [])
 
