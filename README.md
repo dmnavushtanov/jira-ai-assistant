@@ -8,6 +8,8 @@ Phase 2 introduces a simple LangChain agent. The agent wraps the LLM through ``s
 
 Phase 3 adds a YAML based configuration under ``src/config/criteria.yaml`` and a ``HotReloader`` utility to automatically reload files when they change.
 
+Phase 4 introduces ``OpenAIService`` which loads your API key and model from ``config.py`` and provides a light wrapper around the OpenAI response API used by the agent.
+
 ```
 python -m src.cli.main hello
 ```
