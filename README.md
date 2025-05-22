@@ -6,6 +6,8 @@ Phase 1 implemented a basic project scaffold with a minimal REST adapter and a T
 
 Phase 2 introduces a simple LangChain agent. The agent wraps the LLM through ``src.llm.llm_wrapper`` and exposes tools for describing, searching and transitioning Jira issues.
 
+Phase 3 adds a YAML based configuration under ``src/config/criteria.yaml`` and a ``HotReloader`` utility to automatically reload files when they change.
+
 ```
 python -m src.cli.main hello
 ```
