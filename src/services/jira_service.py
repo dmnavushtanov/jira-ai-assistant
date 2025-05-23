@@ -2,12 +2,26 @@ from __future__ import annotations
 
 """Service layer for Jira interactions."""
 
-from typing import Optional, List
+from typing import Any, Optional, List
 
 from src.adapters.jira_api import JiraAPI, JiraConfig
 import requests
 from src.models.jira_models import Comment, Issue
 import config
+
+
+def _extract_plain_text(data: Any) -> str:
+    """Return plain text from Atlassian document format structures."""
+    if isinstance(data, str):
+        return data
+    if isinstance(data, list):
+        return "".join(_extract_plain_text(d) for d in data)
+    if isinstance(data, dict):
+        text = data.get("text", "")
+        if "content" in data:
+            text += "".join(_extract_plain_text(c) for c in data["content"])
+        return text
+    return ""
 
 
 class JiraService:
@@ -32,13 +46,13 @@ class JiraService:
         comment_data = fields.get("comment", {}).get("comments", [])
         for c in comment_data:
             author = c.get("author", {}).get("displayName", "")
-            body = c.get("body", "")
+            body = _extract_plain_text(c.get("body", ""))
             comments.append(Comment(author=author, body=body))
 
         return Issue(
             key=data.get("key", issue_key),
             summary=fields.get("summary", ""),
-            description=fields.get("description"),
+            description=_extract_plain_text(fields.get("description")),
             comments=comments,
         )
 
