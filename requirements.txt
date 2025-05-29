@@ -1,6 +1,0 @@
-openai
-requests
-Typer
-pydantic
-langchain
-python-dotenv
