@@ -1,13 +1,8 @@
-smolagents
-requests
+openai
+python-dotenv
 pytz
 PyYAML
-gradio
-huggingface_hub
-transformers
-torch 
-markdownify
-smolagents==1.13.0
 requests
+smolagents==1.13.0
+gradio
 duckduckgo_search
-pandas
