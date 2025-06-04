@@ -1,71 +1,112 @@
+import json
+import os
+from typing import Dict, Any
+
 from langchain.tools import Tool
 
+from src.jira_client import JiraClient
+
+
+def _get_jira_client() -> JiraClient:
+    """Instantiate a :class:`JiraClient` using environment variables."""
+    base_url = os.getenv("JIRA_BASE_URL")
+    email = os.getenv("JIRA_EMAIL")
+    token = os.getenv("JIRA_API_TOKEN")
+    if not all([base_url, email, token]):
+        raise ValueError(
+            "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN environment variables must be set"
+        )
+    return JiraClient(base_url, email, token)
+
+
 # --- Tool for getting issue details by ID ---
+
 def get_issue_by_id_func(issue_id: str) -> str:
-    """Fetches details for a given Jira issue ID."""
-    # Call your Jira API here
-    # For example, using the mcp_Atlassian_MCP_via_CLI_jira_get_issue tool
-    # response = mcp_Atlassian_MCP_via_CLI_jira_get_issue(issue_key=issue_id)
-    # return response 
-    return f"Details for issue {issue_id}"
+    """Fetch details for a given Jira issue ID."""
+    client = _get_jira_client()
+    issue = client.get_issue(issue_id)
+    return json.dumps(issue)
+
 
 get_issue_by_id_tool = Tool(
     name="get_issue_by_id",
     func=get_issue_by_id_func,
-    description="Useful for when you need to get the details of a specific Jira issue. Input should be the Jira issue ID (e.g., 'PROJ-123')."
+    description=(
+        "Useful for when you need to get the details of a specific Jira issue. "
+        "Input should be the Jira issue ID (e.g., 'PROJ-123')."
+    ),
 )
 
+
 # --- Tool for creating a new Jira issue ---
-def create_jira_issue_func(summary: str, description: str, project_key: str, issue_type: str = 'Task') -> str:
-    """Creates a new Jira issue."""
-    # Call Jira POST /issue
-    # For example, using the mcp_Atlassian_MCP_via_CLI_jira_create_issue tool
-    # response = mcp_Atlassian_MCP_via_CLI_jira_create_issue(
-    #     project_key=project_key,
-    #     summary=summary,
-    #     description=description,
-    #     issue_type=issue_type
-    # )
-    # return response
-    return f"Issue '{summary}' created in project {project_key} with description: {description}"
+
+def create_jira_issue_func(
+    summary: str, description: str, project_key: str, issue_type: str = "Task"
+) -> str:
+    """Create a new Jira issue."""
+    client = _get_jira_client()
+    payload: Dict[str, Any] = {
+        "fields": {
+            "project": {"key": project_key},
+            "summary": summary,
+            "description": description,
+            "issuetype": {"name": issue_type},
+        }
+    }
+    issue = client.create_issue(payload)
+    return json.dumps(issue)
+
 
 create_jira_issue_tool = Tool(
     name="create_jira_issue",
     func=create_jira_issue_func,
-    description="Useful for when you need to create a new Jira issue. Requires summary, description, and project_key. Optionally, an issue_type can be provided (default is 'Task')."
+    description=(
+        "Useful for when you need to create a new Jira issue. Requires summary, "
+        "description and project_key. Optionally an issue_type can be provided "
+        "(default is 'Task')."
+    ),
 )
 
-# --- Placeholder for get comments ---
+
+# --- Tool for fetching comments of an issue ---
+
 def get_issue_comments_func(issue_id: str) -> str:
-    """Fetches comments for a given Jira issue ID."""
-    # Call your Jira API here to get comments
-    # For example, using mcp_Atlassian_MCP_via_CLI_jira_get_issue with expand='comment'
-    # or a more specific comment fetching tool if available.
-    return f"Comments for issue {issue_id}"
+    """Fetch comments for a given Jira issue ID."""
+    client = _get_jira_client()
+    response = client.request("GET", f"/rest/api/3/issue/{issue_id}/comment")
+    return json.dumps(response.json())
+
 
 get_issue_comments_tool = Tool(
     name="get_issue_comments",
     func=get_issue_comments_func,
-    description="Useful for when you need to get the comments for a specific Jira issue. Input should be the Jira issue ID (e.g., 'PROJ-123')."
+    description=(
+        "Useful for when you need to get the comments for a specific Jira issue. "
+        "Input should be the Jira issue ID (e.g., 'PROJ-123')."
+    ),
 )
 
-# --- Placeholder for get history/changelog ---
+
+# --- Tool for fetching the changelog/history of an issue ---
+
 def get_issue_history_func(issue_id: str) -> str:
-    """Fetches the history (changelog) for a given Jira issue ID."""
-    # Call your Jira API here to get issue history
-    # For example, mcp_Atlassian_MCP_via_CLI_jira_get_issue with expand='changelog'
-    # or mcp_Atlassian_MCP_via_CLI_jira_batch_get_changelogs
-    return f"History for issue {issue_id}"
+    """Fetch the changelog for a given Jira issue ID."""
+    client = _get_jira_client()
+    response = client.request("GET", f"/rest/api/3/issue/{issue_id}/changelog")
+    return json.dumps(response.json())
+
 
 get_issue_history_tool = Tool(
     name="get_issue_history",
     func=get_issue_history_func,
-    description="Useful for when you need to get the change history for a specific Jira issue. Input should be the Jira issue ID (e.g., 'PROJ-123')."
+    description=(
+        "Useful for when you need to get the change history for a specific Jira "
+        "issue. Input should be the Jira issue ID (e.g., 'PROJ-123')."
+    ),
 )
 
-# You can add more tools here following the same pattern
 
-# To make these tools usable, you might want to collect them in a list:
+# Collection of available Jira tools
 jira_tools = [
     get_issue_by_id_tool,
     create_jira_issue_tool,
@@ -73,9 +114,10 @@ jira_tools = [
     get_issue_history_tool,
 ]
 
-# Example of how you might use one (for testing purposes, not part of the service itself)
-if __name__ == '__main__':
-    print(get_issue_by_id_tool.run("PROJ-123"))
-    print(create_jira_issue_tool.run({"summary": "New Task", "description": "Detailed description here", "project_key": "PROJ"}))
-    print(get_issue_comments_tool.run("PROJ-124"))
-    print(get_issue_history_tool.run("PROJ-125")) 
+__all__ = [
+    "get_issue_by_id_tool",
+    "create_jira_issue_tool",
+    "get_issue_comments_tool",
+    "get_issue_history_tool",
+    "jira_tools",
+]
