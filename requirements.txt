@@ -3,6 +3,4 @@ python-dotenv
 pytz
 PyYAML
 requests
-smolagents==1.13.0
 gradio
-duckduckgo_search
