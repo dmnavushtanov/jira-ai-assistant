@@ -1,23 +1,49 @@
 # Jira AI Assistant
 
-This repository contains small utilities for interacting with Jira issues. The `main.py` script prompts for an issue ID and prints the raw details retrieved from Jira.
+This repository contains a Jira AI assistant that communicates with the OpenAI API and provides utilities for interacting with Jira issues. It includes:
+
+- Simple utilities for retrieving Jira issue details
+- OpenAI service integration for AI-powered assistance
+- A minimal agent that combines both capabilities
 
 ## Configuration
 
-Create a `.env` file based on `.env.example` and provide your Jira credentials:
+Create a `.env` file and provide your credentials:
 
 ```
 JIRA_BASE_URL=https://your-domain.atlassian.net
 JIRA_EMAIL=your-email@example.com
 JIRA_API_TOKEN=your-api-token
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
 ```
+
+The default model can be changed in `config.yaml` or by setting `OPENAI_MODEL` in the environment.
 
 ## Usage
 
-Run the script with Python:
+### Basic Jira Issue Retrieval
+
+The `main.py` script prompts for an issue ID and prints the issue details:
 
 ```bash
 python main.py
 ```
 
-You will be asked for a Jira issue ID and the issue data will be printed to the terminal.
+### OpenAI Service
+
+The `OpenAIService` class can be used to ask arbitrary questions via the OpenAI chat API:
+
+```bash
+python openai_service.py "What is 2 + 2?"
+```
+
+### AI Agent with Jira Tools
+
+`JiraAIAgent` collects all tools defined in `jira_service.py` and exposes an `ask` method that uses the OpenAI service. The agent can be invoked from the command line as well:
+
+```bash
+python agent.py "List the issue details for PROJ-1"
+```
+
+These examples require valid API keys for both OpenAI and Jira when using the respective features.
