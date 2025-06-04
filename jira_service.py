@@ -5,6 +5,9 @@ from typing import Dict, Any
 from langchain.tools import Tool
 
 from src.jira_client import JiraClient
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _get_jira_client() -> JiraClient:
@@ -16,6 +19,7 @@ def _get_jira_client() -> JiraClient:
         raise ValueError(
             "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN environment variables must be set"
         )
+    logger.debug("Creating JiraClient for base_url=%s email=%s", base_url, email)
     return JiraClient(base_url, email, token)
 
 
@@ -23,6 +27,7 @@ def _get_jira_client() -> JiraClient:
 
 def get_issue_by_id_func(issue_id: str) -> str:
     """Fetch details for a given Jira issue ID."""
+    logger.debug("Getting issue by ID: %s", issue_id)
     client = _get_jira_client()
     issue = client.get_issue(issue_id)
     return json.dumps(issue)
@@ -44,6 +49,9 @@ def create_jira_issue_func(
     summary: str, description: str, project_key: str, issue_type: str = "Task"
 ) -> str:
     """Create a new Jira issue."""
+    logger.debug(
+        "Creating Jira issue in project %s with summary %s", project_key, summary
+    )
     client = _get_jira_client()
     fields: Dict[str, Any] = {
         "project": {"key": project_key},
@@ -70,6 +78,7 @@ create_jira_issue_tool = Tool(
 
 def get_issue_comments_func(issue_id: str) -> str:
     """Fetch comments for a given Jira issue ID."""
+    logger.debug("Fetching comments for issue %s", issue_id)
     client = _get_jira_client()
     comments = client.get_comments(issue_id)
     return json.dumps(comments)
@@ -89,6 +98,7 @@ get_issue_comments_tool = Tool(
 
 def get_issue_history_func(issue_id: str) -> str:
     """Fetch the changelog for a given Jira issue ID."""
+    logger.debug("Fetching changelog for issue %s", issue_id)
     client = _get_jira_client()
     changelog = client.get_changelog(issue_id)
     return json.dumps(changelog)
@@ -107,6 +117,7 @@ get_issue_history_tool = Tool(
 
 def add_comment_to_issue_func(issue_id: str, comment: str) -> str:
     """Add a comment to the specified issue."""
+    logger.debug("Adding comment to issue %s", issue_id)
     client = _get_jira_client()
     result = client.add_comment(issue_id, comment)
     return json.dumps(result)
@@ -127,6 +138,7 @@ def update_issue_fields_func(issue_id: str, fields_json: str) -> str:
 
     ``fields_json`` should be a JSON string mapping field names to new values.
     """
+    logger.debug("Updating issue %s with fields %s", issue_id, fields_json)
     client = _get_jira_client()
     fields: Dict[str, Any] = json.loads(fields_json)
     updated = client.update_issue(issue_id, fields)
