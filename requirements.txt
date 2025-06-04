@@ -4,3 +4,4 @@ pytz
 PyYAML
 requests
 gradio
+jira
