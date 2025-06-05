@@ -2,6 +2,10 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
+logger.debug("BaseLLMClient module loaded")
 
 
 class BaseLLMClient(ABC):
