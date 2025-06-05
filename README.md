@@ -5,6 +5,7 @@ This repository contains a Jira AI assistant that communicates with the OpenAI A
 - Simple utilities for retrieving Jira issue details
 - OpenAI service integration for AI-powered assistance
 - A minimal agent that combines both capabilities
+- Optional Langfuse integration for monitoring LLM calls
 
 ## Configuration
 
@@ -17,9 +18,17 @@ JIRA_API_TOKEN=your-api-token
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
 BASE_LLM=openai  # or 'anthropic'
+LANGFUSE_PUBLIC_KEY=your-langfuse-public-key
+LANGFUSE_SECRET_KEY=your-langfuse-secret-key
+# Optional custom host, defaults to Langfuse cloud
+LANGFUSE_HOST=https://app.langfuse.com
 ```
 
 The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment.
+
+If `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are provided, all LLM calls
+will be reported to Langfuse. Set `LANGFUSE_HOST` when using a self-hosted
+instance.
 
 ## Usage
 
