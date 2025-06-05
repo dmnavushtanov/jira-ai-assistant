@@ -13,7 +13,7 @@ class OpenAIService:
         """Return the assistant answer for ``question`` using OpenAI chat API."""
         messages: List[Dict[str, str]] = [{"role": "user", "content": question}]
         response = self.client.chat_completion(messages, **kwargs)
-        return response["choices"][0]["message"]["content"].strip()
+        return response.choices[0].message.content.strip()
 
 
 __all__ = ["OpenAIService"]
