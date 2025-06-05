@@ -19,7 +19,7 @@ OPENAI_MODEL=gpt-4o-mini
 BASE_LLM=openai  # or 'anthropic'
 ```
 
-The default model and provider can be changed in `src/configs/config.yaml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment.
+The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment.
 
 ## Usage
 

@@ -2,6 +2,7 @@ from typing import Any, List, Dict
 
 from src.llm_clients.openai_client import OpenAIClient
 import logging
+from src.configs import load_config, setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,9 @@ __all__ = ["OpenAIService"]
 
 if __name__ == "__main__":
     import sys
+
+    cfg = load_config()
+    setup_logging(cfg)
 
     prompt = " ".join(sys.argv[1:]) or input("Ask a question: ")
     service = OpenAIService()

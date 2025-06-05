@@ -3,9 +3,14 @@ from dotenv import load_dotenv
 from src.jira_client import JiraClient
 from src.agents.classifier import ClassifierAgent
 from src.prompts import load_prompt
+from src.configs import load_config, setup_logging
 
 # Load environment variables from .env file (force reload)
 load_dotenv(override=True)
+
+# Load application configuration and configure logging
+config = load_config()
+setup_logging(config)
 
 
 def get_jira_client():
