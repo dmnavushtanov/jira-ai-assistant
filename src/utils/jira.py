@@ -1,5 +1,5 @@
 """Jira-related helper utilities."""
-from typing import Any, List
+from typing import Any, Dict, List
 
 
 def extract_plain_text(content: Any) -> str:
@@ -25,4 +25,33 @@ def extract_plain_text(content: Any) -> str:
     return " ".join(parts).strip()
 
 
-__all__ = ["extract_plain_text"]
+
+class JiraUtils:
+    """Helper methods for cleaning and parsing Jira issues."""
+
+    CUSTOM_FIELD_PREFIX = "customfield_"
+
+    @classmethod
+    def clean_fields(cls, fields: Dict[str, Any]) -> Dict[str, Any]:
+        """Return ``fields`` without ``None`` custom fields."""
+        if not isinstance(fields, dict):
+            return fields
+        return {
+            k: v
+            for k, v in fields.items()
+            if not (k.startswith(cls.CUSTOM_FIELD_PREFIX) and v is None)
+        }
+
+    @classmethod
+    def clean_issue(cls, issue: Dict[str, Any]) -> Dict[str, Any]:
+        """Return ``issue`` with ``None`` custom fields removed."""
+        fields = issue.get("fields")
+        if isinstance(fields, dict):
+            cleaned = cls.clean_fields(fields)
+            if cleaned is not fields:
+                issue = dict(issue)
+                issue["fields"] = cleaned
+        return issue
+
+
+__all__ = ["extract_plain_text", "JiraUtils"]
