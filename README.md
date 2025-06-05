@@ -18,7 +18,7 @@ OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-The default model can be changed in `config.yaml` or by setting `OPENAI_MODEL` in the environment.
+The default model can be changed in `src/configs/config.yaml` or by setting `OPENAI_MODEL` in the environment.
 
 ## Usage
 

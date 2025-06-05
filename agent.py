@@ -1,7 +1,7 @@
 from typing import List
 
-from jira_service import jira_tools
-from openai_service import OpenAIService
+from src.services.jira_service import jira_tools
+from src.services.openai_service import OpenAIService
 
 
 class JiraAIAgent:

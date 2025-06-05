@@ -1,13 +1,13 @@
 import openai
 from typing import List, Dict, Any
 
-from config import load_config
+from configs.config import load_config
 
 
 class OpenAIClient:
     """Simple wrapper around the OpenAI SDK."""
 
-    def __init__(self, config_path: str = "config.yaml") -> None:
+    def __init__(self, config_path: str = None) -> None:
         self.config = load_config(config_path)
         openai.api_key = self.config.openai_api_key
 

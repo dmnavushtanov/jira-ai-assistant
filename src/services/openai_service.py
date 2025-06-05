@@ -6,7 +6,7 @@ from src.llm_clients.openai_client import OpenAIClient
 class OpenAIService:
     """High level service exposing simple question answering using OpenAI."""
 
-    def __init__(self, config_path: str = "config.yaml") -> None:
+    def __init__(self, config_path: str = None) -> None:
         self.client = OpenAIClient(config_path)
 
     def ask_question(self, question: str, **kwargs: Any) -> str:

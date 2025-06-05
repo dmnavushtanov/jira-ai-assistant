@@ -9,9 +9,15 @@ class Config:
     openai_model: str
 
 
-def load_config(path: str = "config.yaml") -> Config:
+def load_config(path: str = None) -> Config:
     """Load configuration from YAML file and environment variables."""
     load_dotenv()
+    
+    # If no path provided, use default relative to this config.py file
+    if path is None:
+        config_dir = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(config_dir, "config.yaml")
+    
     data = {}
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
