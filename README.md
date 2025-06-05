@@ -16,9 +16,10 @@ JIRA_EMAIL=your-email@example.com
 JIRA_API_TOKEN=your-api-token
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
+BASE_LLM=openai  # or 'anthropic'
 ```
 
-The default model can be changed in `src/configs/config.yaml` or by setting `OPENAI_MODEL` in the environment.
+The default model and provider can be changed in `src/configs/config.yaml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment.
 
 ## Usage
 

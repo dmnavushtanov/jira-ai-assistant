@@ -1,9 +1,7 @@
-"""
-LLM Clients module for the Jira AI Assistant.
-
-This module contains clients for various Large Language Model services.
-"""
+"""LLM client implementations."""
 
 from .openai_client import OpenAIClient
+from .claude_client import ClaudeClient
 
-__all__ = ["OpenAIClient"] 
+__all__ = ["OpenAIClient", "ClaudeClient"]
+
