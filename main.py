@@ -10,6 +10,9 @@ from src.prompts import load_prompt
 from src.utils import safe_format
 from src.configs import load_config, setup_logging
 from src.services.jira_service import get_issue_by_id_tool
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file (force reload)
 load_dotenv(override=True)
@@ -30,26 +33,33 @@ def get_jira_client():
             "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN must be set in .env file"
         )
     
+    logger.debug("Creating JiraClient for %s", base_url)
     return JiraClient(base_url, email, token)
 
 
 def main() -> None:
+    logger.info("Starting main interaction loop")
     issue_id = input("Enter Jira issue ID: ").strip()
 
+    logger.debug("Instantiating agents")
     classifier = ClassifierAgent()
     validator = ApiValidatorAgent()
 
     def classify_step(iid: str) -> dict:
+        logger.debug("Fetching issue %s", iid)
         issue_json = get_issue_by_id_tool.run(iid)
         issue = json.loads(issue_json)
 
-        print("\nIssue found:")
-        print(f"Key: {issue.get('key')}")
-        fields = issue.get('fields', {})
-        project = fields.get('project', {})
-        print(f"Project: {project.get('key')} - {project.get('name')}")
-        print(f"Summary: {fields.get('summary')}")
-        print(f"Status: {fields.get('status', {}).get('name')}")
+        logger.info("Issue found: %s", issue.get("key"))
+        fields = issue.get("fields", {})
+        project = fields.get("project", {})
+        logger.debug(
+            "Project: %s - %s | Summary: %s | Status: %s",
+            project.get("key"),
+            project.get("name"),
+            fields.get("summary"),
+            fields.get("status", {}).get("name"),
+        )
 
         prompt = safe_format(
             load_prompt("classifier.txt"),
@@ -59,12 +69,14 @@ def main() -> None:
             },
         )
         classification = classifier.classify(prompt)
-        print(f"\nClassification: {classification}")
+        logger.info("Classification: %s", classification)
         return {"issue": issue, "classification": classification}
 
     def validate_step(data: dict) -> str:
         if str(data.get("classification", "")).upper().startswith("API"):
+            logger.debug("Issue classified as API related; validating")
             return validator.validate(data["issue"])
+        logger.debug("Issue not API related; skipping validation")
         return "Validation skipped (not API related)"
 
     sequence = RunnableSequence(
@@ -74,9 +86,9 @@ def main() -> None:
 
     try:
         result = sequence.invoke(issue_id)
-        print(f"Validation result: {result}")
+        logger.info("Validation result: %s", result)
     except Exception as exc:
-        print(f"Error: {exc}")
+        logger.exception("Error during validation")
 
 
 if __name__ == "__main__":
