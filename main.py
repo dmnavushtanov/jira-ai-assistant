@@ -7,6 +7,7 @@ from langchain.schema.runnable import RunnableLambda, RunnableSequence
 from src.agents.classifier import ClassifierAgent
 from src.agents.api_validator import ApiValidatorAgent
 from src.prompts import load_prompt
+from src.utils import safe_format
 from src.configs import load_config, setup_logging
 from src.services.jira_service import get_issue_by_id_tool
 
@@ -50,9 +51,12 @@ def main() -> None:
         print(f"Summary: {fields.get('summary')}")
         print(f"Status: {fields.get('status', {}).get('name')}")
 
-        prompt = load_prompt("classifier.txt").format(
-            summary=fields.get('summary', ''),
-            description=fields.get('description', ''),
+        prompt = safe_format(
+            load_prompt("classifier.txt"),
+            {
+                "summary": fields.get('summary', ''),
+                "description": fields.get('description', ''),
+            },
         )
         classification = classifier.classify(prompt)
         print(f"\nClassification: {classification}")
