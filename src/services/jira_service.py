@@ -20,6 +20,7 @@ def _get_jira_client() -> JiraClient:
             "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN environment variables must be set"
         )
     logger.debug("Creating JiraClient for base_url=%s email=%s", base_url, email)
+    logger.info("JiraClient initialized for %s", base_url)
     return JiraClient(base_url, email, token)
 
 
@@ -30,6 +31,7 @@ def get_issue_by_id_func(issue_id: str) -> str:
     logger.debug("Getting issue by ID: %s", issue_id)
     client = _get_jira_client()
     issue = client.get_issue(issue_id)
+    logger.info("Fetched issue %s", issue_id)
     return json.dumps(issue)
 
 
@@ -60,6 +62,11 @@ def create_jira_issue_func(
         "issuetype": {"name": issue_type},
     }
     issue = client.create_issue(fields)
+    logger.info(
+        "Created issue %s in project %s",
+        issue.get("key", "unknown"),
+        project_key,
+    )
     return json.dumps(issue)
 
 
@@ -81,6 +88,7 @@ def get_issue_comments_func(issue_id: str) -> str:
     logger.debug("Fetching comments for issue %s", issue_id)
     client = _get_jira_client()
     comments = client.get_comments(issue_id)
+    logger.info("Retrieved %d comments for issue %s", len(comments), issue_id)
     return json.dumps(comments)
 
 
@@ -101,6 +109,7 @@ def get_issue_history_func(issue_id: str) -> str:
     logger.debug("Fetching changelog for issue %s", issue_id)
     client = _get_jira_client()
     changelog = client.get_changelog(issue_id)
+    logger.info("Fetched changelog for issue %s", issue_id)
     return json.dumps(changelog)
 
 
@@ -120,6 +129,7 @@ def add_comment_to_issue_func(issue_id: str, comment: str) -> str:
     logger.debug("Adding comment to issue %s", issue_id)
     client = _get_jira_client()
     result = client.add_comment(issue_id, comment)
+    logger.info("Added comment to issue %s", issue_id)
     return json.dumps(result)
 
 add_comment_to_issue_tool = Tool(
@@ -142,6 +152,7 @@ def update_issue_fields_func(issue_id: str, fields_json: str) -> str:
     client = _get_jira_client()
     fields: Dict[str, Any] = json.loads(fields_json)
     updated = client.update_issue(issue_id, fields)
+    logger.info("Updated issue %s", issue_id)
     return json.dumps(updated)
 
 update_issue_fields_tool = Tool(
