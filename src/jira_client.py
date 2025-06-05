@@ -1,5 +1,7 @@
 from typing import Any, Dict, List
 
+from src.utils import JiraUtils
+
 from jira import JIRA
 import logging
 
@@ -17,13 +19,13 @@ class JiraClient:
         """Retrieve an issue by its key."""
         logger.debug("Fetching issue %s", issue_key)
         issue = self._jira.issue(issue_key, expand=expand)
-        return issue.raw
+        return JiraUtils.clean_issue(issue.raw)
 
     def create_issue(self, fields: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new issue and return its raw representation."""
         logger.debug("Creating issue with fields: %s", fields)
         issue = self._jira.create_issue(fields=fields)
-        return issue.raw
+        return JiraUtils.clean_issue(issue.raw)
 
     def add_comment(self, issue_key: str, comment: str) -> Dict[str, Any]:
         """Add a comment to an issue and return the created comment."""
@@ -42,7 +44,7 @@ class JiraClient:
         logger.debug("Updating issue %s with fields: %s", issue_key, fields)
         issue = self._jira.issue(issue_key)
         issue.update(fields=fields)
-        return issue.raw
+        return JiraUtils.clean_issue(issue.raw)
 
     def get_changelog(self, issue_key: str) -> Dict[str, Any]:
         """Return changelog for an issue."""
@@ -54,4 +56,4 @@ class JiraClient:
         """Run a JQL query and return the matching issues."""
         logger.debug("Searching issues with JQL: %s", jql)
         issues = self._jira.search_issues(jql, **kwargs)
-        return [iss.raw for iss in issues]
+        return [JiraUtils.clean_issue(iss.raw) for iss in issues]
