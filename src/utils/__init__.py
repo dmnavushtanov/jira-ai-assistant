@@ -1,8 +1,4 @@
-"""
-Utilities module for the Jira AI Assistant.
+"""Utility helpers for the Jira AI Assistant."""
 
-This module contains utility functions and helper classes.
-"""
+__all__: list[str] = []
 
-# Add utility imports here as they are implemented
-__all__ = [] 

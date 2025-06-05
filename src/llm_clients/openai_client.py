@@ -2,9 +2,10 @@ import openai
 from typing import List, Dict, Any
 
 from configs.config import load_config
+from src.llm_clients.base_llm_client import BaseLLMClient
 
 
-class OpenAIClient:
+class OpenAIClient(BaseLLMClient):
     """Simple wrapper around the OpenAI SDK."""
 
     def __init__(self, config_path: str = None) -> None:
@@ -18,3 +19,6 @@ class OpenAIClient:
             messages=messages,
             **kwargs,
         )
+
+
+__all__ = ["OpenAIClient"]
