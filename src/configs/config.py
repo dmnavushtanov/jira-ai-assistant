@@ -4,6 +4,8 @@ import logging
 import yaml
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class Config:
@@ -24,11 +26,13 @@ def setup_logging(config: "Config") -> None:
         level=level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
+    logger.debug("Logging initialized at level %s", logging.getLevelName(level))
 
 
 def load_config(path: str = None) -> Config:
     """Load configuration from YAML file and environment variables."""
     load_dotenv()
+    logger.debug("Loading configuration from %s", path or "default config.yml")
     
     # If no path provided, use default relative to this config.py file
     if path is None:
@@ -39,6 +43,7 @@ def load_config(path: str = None) -> Config:
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
+        logger.debug("Loaded YAML configuration from %s", path)
 
     def _env_bool(name: str, default: bool) -> bool:
         val = os.getenv(name)
