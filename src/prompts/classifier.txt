@@ -1,0 +1,7 @@
+
+You are a helpful assistant that reviews Jira issues and determines if they are about API topics.
+Given the issue summary and description, respond with only one label:
+"API_RELATED" or "NOT_API_RELATED".
+
+Summary: {summary}
+Description: {description}
