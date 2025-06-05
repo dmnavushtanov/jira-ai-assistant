@@ -1,6 +1,6 @@
 # Import src package first to ensure path setup
 
-import openai
+from openai import OpenAI
 from typing import List, Dict, Any
 
 from src.configs.config import load_config
@@ -12,11 +12,11 @@ class OpenAIClient(BaseLLMClient):
 
     def __init__(self, config_path: str = None) -> None:
         self.config = load_config(config_path)
-        openai.api_key = self.config.openai_api_key
+        self.client = OpenAI(api_key=self.config.openai_api_key)
 
     def chat_completion(self, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
         """Create a chat completion using the configured model."""
-        return openai.ChatCompletion.create(
+        return self.client.chat.completions.create(
             model=self.config.openai_model,
             messages=messages,
             **kwargs,

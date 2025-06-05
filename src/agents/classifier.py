@@ -25,9 +25,12 @@ class ClassifierAgent:
         messages: List[Dict[str, str]] = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         try:
-            return response["choices"][0]["message"]["content"].strip()
+            return response.choices[0].message.content.strip()
         except Exception:
-            return response
+            try:
+                return response["choices"][0]["message"]["content"].strip()
+            except Exception:
+                return response
 
 
 __all__ = ["ClassifierAgent"]
