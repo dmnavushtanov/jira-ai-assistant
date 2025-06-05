@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any
 
-from configs.config import load_config
+from src.configs.config import load_config
 from src.llm_clients.base_llm_client import BaseLLMClient
 
 

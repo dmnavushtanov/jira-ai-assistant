@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any
 
-from configs import load_config
+from src.configs.config import load_config
 from src.llm_clients.openai_client import OpenAIClient
 from src.llm_clients.claude_client import ClaudeClient
 
