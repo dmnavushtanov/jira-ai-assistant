@@ -1,9 +1,14 @@
 import os
 from dotenv import load_dotenv
 from src.jira_client import JiraClient
+import json
+from langchain.schema.runnable import RunnableLambda, RunnableSequence
+
 from src.agents.classifier import ClassifierAgent
+from src.agents.api_validator import ApiValidatorAgent
 from src.prompts import load_prompt
 from src.configs import load_config, setup_logging
+from src.services.jira_service import get_issue_by_id_tool
 
 # Load environment variables from .env file (force reload)
 load_dotenv(override=True)
@@ -28,44 +33,46 @@ def get_jira_client():
 
 
 def main() -> None:
-    print("Initializing Jira client...")
-    
-    try:
-        client = get_jira_client()
-        print("Jira client initialized successfully")
-    except Exception as exc:
-        print(f"Failed to initialize Jira client: {exc}")
-        return
-
     issue_id = input("Enter Jira issue ID: ").strip()
 
-    try:
-        issue = client.get_issue(issue_id)
+    classifier = ClassifierAgent()
+    validator = ApiValidatorAgent()
+
+    def classify_step(iid: str) -> dict:
+        issue_json = get_issue_by_id_tool.run(iid)
+        issue = json.loads(issue_json)
+
         print("\nIssue found:")
-        print(f"Key: {issue['key']}")
-        print(
-            f"Project: {issue['fields']['project']['key']} - {issue['fields']['project']['name']}"
-        )
-        print(f"Summary: {issue['fields']['summary']}")
-        print(f"Status: {issue['fields']['status']['name']}")
-        assignee = issue['fields']['assignee']['displayName'] if issue['fields']['assignee'] else 'Unassigned'
-        print(f"Assignee: {assignee}")
-        print(f"Reporter: {issue['fields']['reporter']['displayName']}")
-        print(f"Created: {issue['fields']['created']}")
-        print(f"Updated: {issue['fields']['updated']}")
+        print(f"Key: {issue.get('key')}")
+        fields = issue.get('fields', {})
+        project = fields.get('project', {})
+        print(f"Project: {project.get('key')} - {project.get('name')}")
+        print(f"Summary: {fields.get('summary')}")
+        print(f"Status: {fields.get('status', {}).get('name')}")
 
-        # Classify issue using the LLM
-        prompt_template = load_prompt("classifier.txt")
-        prompt = prompt_template.format(
-            summary=issue['fields'].get('summary', ''),
-            description=issue['fields'].get('description', '')
+        prompt = load_prompt("classifier.txt").format(
+            summary=fields.get('summary', ''),
+            description=fields.get('description', ''),
         )
-        agent = ClassifierAgent()
-        classification = agent.classify(prompt)
+        classification = classifier.classify(prompt)
         print(f"\nClassification: {classification}")
+        return {"issue": issue, "classification": classification}
 
+    def validate_step(data: dict) -> str:
+        if str(data.get("classification", "")).upper().startswith("API"):
+            return validator.validate(data["issue"])
+        return "Validation skipped (not API related)"
+
+    sequence = RunnableSequence(
+        first=RunnableLambda(classify_step),
+        last=RunnableLambda(validate_step),
+    )
+
+    try:
+        result = sequence.invoke(issue_id)
+        print(f"Validation result: {result}")
     except Exception as exc:
-        print(f"Failed to fetch issue {issue_id}: {exc}")
+        print(f"Error: {exc}")
 
 
 if __name__ == "__main__":

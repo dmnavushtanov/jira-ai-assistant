@@ -6,6 +6,7 @@ import logging
 from src.configs.config import load_config
 from src.llm_clients.openai_client import OpenAIClient
 from src.llm_clients.claude_client import ClaudeClient
+from src.services.jira_service import get_issue_by_id_tool
 
 logger = logging.getLogger(__name__)
 logger.debug("classifier module loaded")
@@ -28,6 +29,9 @@ class ClassifierAgent:
         else:
             logger.error("Unsupported LLM provider: %s", self.config.base_llm)
             raise ValueError(f"Unsupported LLM provider: {self.config.base_llm}")
+
+        # Tools available to this agent
+        self.tools = [get_issue_by_id_tool]
 
     def classify(self, prompt: str, **kwargs: Any) -> Any:
         """Return the classification result for ``prompt``."""
