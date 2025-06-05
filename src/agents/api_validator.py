@@ -7,7 +7,8 @@ from typing import Any, Dict
 
 import yaml
 
-from src.prompts import load_prompt, PROMPTS_DIR
+from src.prompts import load_prompt
+from src.utils import extract_plain_text
 from src.configs.config import load_config
 from src.llm_clients.openai_client import OpenAIClient
 from src.llm_clients.claude_client import ClaudeClient
@@ -66,8 +67,8 @@ class ApiValidatorAgent:
 
         prompt = template.format(
             key=issue.get("key", ""),
-            summary=fields.get("summary", ""),
-            description=fields.get("description", ""),
+            summary=extract_plain_text(fields.get("summary")),
+            description=extract_plain_text(fields.get("description")),
             status=status,
         )
         logger.debug("Prompt for validation: %s", prompt)
