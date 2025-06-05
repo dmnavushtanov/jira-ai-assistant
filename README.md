@@ -31,6 +31,13 @@ The `main.py` script prompts for an issue ID and prints the issue details:
 python main.py
 ```
 
+### Classification and Validation Pipeline
+
+`main.py` now chains the classifier and API validator using LangChain's
+`RunnableSequence`. Enter a Jira issue ID and the script will fetch the issue
+with the `get_issue_by_id` tool, classify whether it is API related and, if so,
+validate it based on the issue status.
+
 ### OpenAI Service
 
 The `OpenAIService` class can be used to ask arbitrary questions via the OpenAI chat API:
