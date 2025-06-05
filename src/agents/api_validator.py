@@ -8,7 +8,7 @@ from typing import Any, Dict
 import yaml
 
 from src.prompts import load_prompt
-from src.utils import extract_plain_text
+from src.utils import extract_plain_text, safe_format
 from src.configs.config import load_config
 from src.llm_clients.openai_client import OpenAIClient
 from src.llm_clients.claude_client import ClaudeClient
@@ -33,6 +33,7 @@ def _load_status_prompts() -> Dict[str, str]:
     except yaml.YAMLError:
         logger.exception("Failed to parse api_validator.txt as YAML")
         return {}
+
 
 
 class ApiValidatorAgent:
@@ -65,12 +66,17 @@ class ApiValidatorAgent:
             logger.warning("No prompt found for status %s", status)
             return ""
 
-        prompt = template.format(
-            key=issue.get("key", ""),
-            summary=extract_plain_text(fields.get("summary")),
-            description=extract_plain_text(fields.get("description")),
-            status=status,
-        )
+        values = {
+            "key": issue.get("key", ""),
+            "summary": extract_plain_text(fields.get("summary")),
+            "description": extract_plain_text(fields.get("description")),
+            "status": status,
+        }
+        try:
+            prompt = safe_format(template, values)
+        except Exception:
+            logger.exception("Failed to format prompt")
+            return ""
         logger.debug("Prompt for validation: %s", prompt)
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
