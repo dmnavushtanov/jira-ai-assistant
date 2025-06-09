@@ -17,9 +17,10 @@ JIRA_API_TOKEN=your-api-token
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
 BASE_LLM=openai  # or 'anthropic'
+INCLUDE_WHOLE_API_BODY=false
 ```
 
-The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment.
+The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment. The flag `INCLUDE_WHOLE_API_BODY` controls whether validation prompts should return the full API bodies or only boolean indicators of their validity.
 
 ## Usage
 
