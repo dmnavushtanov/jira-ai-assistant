@@ -5,6 +5,7 @@ This repository contains a Jira AI assistant that communicates with the OpenAI A
 - Simple utilities for retrieving Jira issue details
 - OpenAI service integration for AI-powered assistance
 - A minimal agent that combines both capabilities
+- Built-in LangChain moderation to reject unsafe or non-Jira questions
 
 ## Configuration
 
