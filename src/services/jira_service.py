@@ -39,8 +39,8 @@ get_issue_by_id_tool = Tool(
     name="get_issue_by_id",
     func=get_issue_by_id_func,
     description=(
-        "Useful for when you need to get the details of a specific Jira issue. "
-        "Input should be the Jira issue ID (e.g., 'PROJ-123')."
+        "Return the JSON details for a Jira issue. "
+        "Input is the issue key such as 'PROJ-123'."
     ),
 )
 
@@ -74,9 +74,8 @@ create_jira_issue_tool = Tool(
     name="create_jira_issue",
     func=create_jira_issue_func,
     description=(
-        "Useful for when you need to create a new Jira issue. Requires summary, "
-        "description and project_key. Optionally an issue_type can be provided "
-        "(default is 'Task')."
+        "Create a new Jira issue using summary, description and project_key. "
+        "Optionally specify issue_type (default 'Task'). Returns the created issue JSON."
     ),
 )
 
@@ -96,8 +95,7 @@ get_issue_comments_tool = Tool(
     name="get_issue_comments",
     func=get_issue_comments_func,
     description=(
-        "Useful for when you need to get the comments for a specific Jira issue. "
-        "Input should be the Jira issue ID (e.g., 'PROJ-123')."
+        "Return all comments for a Jira issue key as JSON."
     ),
 )
 
@@ -117,8 +115,7 @@ get_issue_history_tool = Tool(
     name="get_issue_history",
     func=get_issue_history_func,
     description=(
-        "Useful for when you need to get the change history for a specific Jira "
-        "issue. Input should be the Jira issue ID (e.g., 'PROJ-123')."
+        "Return the change history (changelog) for a Jira issue key as JSON."
     ),
 )
 
@@ -136,8 +133,8 @@ add_comment_to_issue_tool = Tool(
     name="add_comment_to_issue",
     func=add_comment_to_issue_func,
     description=(
-        "Useful for adding a text comment to an existing Jira issue."
-        " Input requires the issue ID and the comment body."
+        "Add a text comment to an existing Jira issue. "
+        "Provide the issue key and comment. Returns the created comment JSON."
     ),
 )
 
@@ -159,8 +156,9 @@ update_issue_fields_tool = Tool(
     name="update_issue_fields",
     func=update_issue_fields_func,
     description=(
-        "Update fields of an existing Jira issue."
-        " Input should be the issue ID followed by a JSON string of fields to update."
+        "Update one or more fields on a Jira issue. "
+        "Provide the issue key and a JSON string of field-value pairs. "
+        "Returns the updated issue JSON."
     ),
 )
 

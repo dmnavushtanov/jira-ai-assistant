@@ -68,16 +68,27 @@ class IssueInsightsAgent:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def ask(self, issue_id: str, question: str, **kwargs: Any) -> str:
+    def ask(
+        self, issue_id: str, question: str, include_history: bool = True, **kwargs: Any
+    ) -> str:
         """Answer ``question`` about ``issue_id`` using the configured LLM."""
         logger.info("Answering question for issue %s", issue_id)
         issue_json = get_issue_by_id_tool.run(issue_id)
-        history_json = get_issue_history_tool.run(issue_id)
+        history_json = get_issue_history_tool.run(issue_id) if include_history else ""
 
-        prompt_template = self.insights_prompt or (
-            "You are a Jira assistant. Given the issue details and change history below, answer the user's question.\n"
-            "Issue JSON:\n{issue}\n\nHistory JSON:\n{history}\n\nQuestion: {question}"
-        )
+        if include_history:
+            prompt_template = self.insights_prompt or (
+                "You are a Jira assistant. Given the issue details and change history below, answer the user's question.\n"
+                "Issue JSON:\n{issue}\n\nHistory JSON:\n{history}\n\nQuestion: {question}"
+            )
+        else:
+            prompt_template = (
+                self.insights_prompt
+                or (
+                    "You are a Jira assistant. Given the issue details below, answer the user's question.\n"
+                    "Issue JSON:\n{issue}\n\nQuestion: {question}"
+                )
+            )
         values = {"issue": issue_json, "history": history_json, "question": question}
         prompt = safe_format(prompt_template, values)
         messages = [{"role": "user", "content": prompt}]
