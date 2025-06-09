@@ -7,6 +7,19 @@ import logging
 import re
 from typing import Any
 
+try:
+    from langchain.memory import (
+        ConversationBufferWindowMemory,
+        ConversationSummaryMemory,
+        CombinedMemory,
+    )
+    from langchain_openai import ChatOpenAI
+except Exception:  # pragma: no cover - optional dependency
+    ConversationBufferWindowMemory = None
+    ConversationSummaryMemory = None
+    CombinedMemory = None
+    ChatOpenAI = None
+
 from src.configs.config import load_config
 from src.agents.classifier import ClassifierAgent
 from src.agents.issue_insights import IssueInsightsAgent
@@ -28,6 +41,41 @@ class RouterAgent:
         self.classifier = ClassifierAgent(config_path)
         self.validator = ApiValidatorAgent(config_path)
         self.insights = IssueInsightsAgent(config_path)
+        self.use_memory = self.config.conversation_memory
+        self.max_history = self.config.max_questions_to_remember
+        if self.use_memory:
+            if None in (
+                ConversationBufferWindowMemory,
+                CombinedMemory,
+                ChatOpenAI,
+            ):
+                logger.warning("LangChain not installed; conversation memory disabled")
+                self.use_memory = False
+                self.memory = None
+            else:
+                if self.max_history > 3:
+                    llm = ChatOpenAI(
+                        model=self.config.openai_model,
+                        api_key=self.config.openai_api_key,
+                    )
+                    buffer_mem = ConversationBufferWindowMemory(
+                        k=self.max_history,
+                        return_messages=True,
+                    )
+                    summary_mem = ConversationSummaryMemory(
+                        llm=llm,
+                        return_messages=True,
+                    )
+                    self.memory = CombinedMemory(
+                        memories=[buffer_mem, summary_mem]
+                    )
+                else:
+                    self.memory = ConversationBufferWindowMemory(
+                        k=self.max_history,
+                        return_messages=True,
+                    )
+        else:
+            self.memory = None
         if self.config.projects:
             pattern = "|".join(re.escape(p) for p in self.config.projects)
         else:
@@ -99,17 +147,52 @@ class RouterAgent:
     def ask(self, question: str, **kwargs: Any) -> str:
         """Route ``question`` to the appropriate workflow."""
         logger.info("Router received question: %s", question)
+
+        if self.use_memory and self.memory is not None:
+            user_count = sum(
+                1 for m in self.memory.chat_memory.messages if m.type == "human"
+            )
+            if user_count >= self.max_history:
+                ans = input(
+                    "max_context_window reached - start new conversation - Y/N: "
+                ).strip().lower()
+                if ans.startswith("y"):
+                    self.memory.clear()
+            self.memory.chat_memory.add_user_message(question)
+
         issue_id = self._extract_issue_id(question)
         if not issue_id:
-            return "No Jira ticket found in question"
+            answer = "No Jira ticket found in question"
+            if self.use_memory and self.memory is not None:
+                self.memory.chat_memory.add_ai_message(answer)
+            return answer
 
         if self._should_validate(question, **kwargs):
             logger.info("Routing to validation workflow")
-            return self._classify_and_validate(issue_id, **kwargs)
+            answer = self._classify_and_validate(issue_id, **kwargs)
+            if self.use_memory and self.memory is not None:
+                self.memory.chat_memory.add_ai_message(answer)
+            return answer
 
         logger.info("Routing to general insights workflow")
         include_history = self._needs_history(question, **kwargs)
-        return self.insights.ask(issue_id, question, include_history=include_history, **kwargs)
+        history_msgs = None
+        if self.use_memory:
+            history_msgs = [
+                {"role": m.type, "content": m.content}
+                for m in self.memory.chat_memory.messages
+            ]
+
+        answer = self.insights.ask(
+            issue_id,
+            question,
+            include_history=include_history,
+            history=history_msgs,
+            **kwargs,
+        )
+        if self.use_memory and self.memory is not None:
+            self.memory.chat_memory.add_ai_message(answer)
+        return answer
 
 
 __all__ = ["RouterAgent"]

@@ -29,6 +29,8 @@ class Config:
     include_whole_api_body: bool
     langchain_debug: bool
     rich_logging: bool
+    conversation_memory: bool
+    max_questions_to_remember: int
 
 
 def setup_logging(config: "Config") -> None:
@@ -79,6 +81,15 @@ def load_config(path: str = None) -> Config:
             return bool(data.get(name.lower(), default))
         return val.lower() in {"1", "true", "yes", "on"}
 
+    def _env_int(name: str, default: int) -> int:
+        val = os.getenv(name)
+        if val is None:
+            return int(data.get(name.lower(), default))
+        try:
+            return int(val)
+        except ValueError:
+            return default
+
     return Config(
         app_name=data.get("app_name", os.getenv("APP_NAME", "JiraAIAssistant")),
         environment=data.get("environment", os.getenv("ENVIRONMENT", "production")),
@@ -92,4 +103,6 @@ def load_config(path: str = None) -> Config:
         include_whole_api_body=_env_bool("INCLUDE_WHOLE_API_BODY", data.get("include_whole_api_body", False)),
         langchain_debug=_env_bool("LANGCHAIN_DEBUG", data.get("langchain_debug", False)),
         rich_logging=_env_bool("RICH_LOGGING", data.get("rich_logging", True)),
+        conversation_memory=_env_bool("CONVERSATION_MEMORY", data.get("conversation_memory", False)),
+        max_questions_to_remember=_env_int("MAX_NUMBER_OF_QUESTIONS_TO_REMEMBER", data.get("max_questions_to_remember", 3)),
     )
