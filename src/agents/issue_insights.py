@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any, Dict
+from datetime import datetime
 
 from src.configs.config import load_config
 from src.llm_clients.openai_client import OpenAIClient
@@ -96,7 +97,11 @@ class IssueInsightsAgent:
             )
         values = {"issue": issue_json, "history": history_json, "question": question}
         prompt = safe_format(prompt_template, values)
-        messages = (history or []) + [{"role": "user", "content": prompt}]
+        system_msg = {
+            "role": "system",
+            "content": f"Current date and time: {datetime.now().isoformat()}",
+        }
+        messages = [system_msg] + (history or []) + [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         try:
             return response.choices[0].message.content.strip()
