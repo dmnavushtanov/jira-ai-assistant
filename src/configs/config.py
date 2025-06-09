@@ -27,6 +27,7 @@ class Config:
     anthropic_model: str
     projects: list[str]
     include_whole_api_body: bool
+    langchain_debug: bool
 
 
 def setup_logging(config: "Config") -> None:
@@ -45,6 +46,13 @@ def setup_logging(config: "Config") -> None:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
     logger.debug("Logging initialized at level %s", logging.getLevelName(level))
+    try:
+        import langchain
+
+        langchain.debug = config.langchain_debug
+        logger.debug("LangChain debug mode set to %s", config.langchain_debug)
+    except Exception:
+        logger.debug("LangChain not installed; skipping debug configuration")
 
 
 def load_config(path: str = None) -> Config:
@@ -80,4 +88,5 @@ def load_config(path: str = None) -> Config:
         anthropic_model=os.getenv("ANTHROPIC_MODEL", data.get("anthropic_model", "claude-3-opus")),
         projects=[p.strip().upper() for p in os.getenv("PROJECTS", ",".join(data.get("projects", []))).split(",") if p.strip()] or [],
         include_whole_api_body=_env_bool("INCLUDE_WHOLE_API_BODY", data.get("include_whole_api_body", False)),
+        langchain_debug=_env_bool("LANGCHAIN_DEBUG", data.get("langchain_debug", False)),
     )
