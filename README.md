@@ -23,20 +23,22 @@ The default model and provider can be changed in `src/configs/config.yml` or by 
 
 ## Usage
 
-### Basic Jira Issue Retrieval
+### Router Agent CLI
 
-The `main.py` script prompts for an issue ID and prints the issue details:
+`main.py` now uses the `RouterAgent` to decide whether your question requires
+API validation or general issue insights. Run the script and type any question
+containing a Jira key:
 
 ```bash
 python main.py
 ```
 
-### Classification and Validation Pipeline
+Example questions:
 
-`main.py` now chains the classifier and API validator using LangChain's
-`RunnableSequence`. Enter a Jira issue ID and the script will fetch the issue
-with the `get_issue_by_id` tool, classify whether it is API related and, if so,
-validate it based on the issue status.
+```text
+Validate RB-1234
+What is the status of SD-99?
+```
 
 ### OpenAI Service
 
