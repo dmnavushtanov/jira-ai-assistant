@@ -28,6 +28,8 @@ The default model and provider can be changed in `src/configs/config.yml` or by 
 
 Conversation memory can be enabled with `conversation_memory: true` in the same file. The number of previous questions remembered defaults to three and can be adjusted via `max_questions_to_remember`. When LangChain is available the agent uses a `ConversationBufferWindowMemory` of size `k`. If `k` is greater than three the buffer is combined with `ConversationSummaryMemory` so older turns are summarized automatically. When the limit is reached you'll be prompted to start a new conversation.
 
+The assistant also remembers the last Jira key you referenced. Follow-up questions can omit the key and it will use the stored value. Include the word `forget` in your message to clear this memory.
+
 Set `strip_unused_jira_data: true` in the config to remove avatar URLs and ID fields from Jira payloads for more concise outputs.
 
 ### Debug Logging

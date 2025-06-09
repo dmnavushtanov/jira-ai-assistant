@@ -26,7 +26,7 @@ from src.agents.issue_insights import IssueInsightsAgent
 from src.agents.api_validator import ApiValidatorAgent
 from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
-from src.utils import safe_format
+from src.utils import safe_format, JiraContextMemory
 
 logger = logging.getLogger(__name__)
 logger.debug("router_agent module loaded")
@@ -74,6 +74,7 @@ class RouterAgent:
                     )
         else:
             self.memory = None
+        self.session_memory = JiraContextMemory()
         if self.config.projects:
             pattern = "|".join(re.escape(p) for p in self.config.projects)
         else:
@@ -161,10 +162,15 @@ class RouterAgent:
             self.memory.chat_memory.add_user_message(question)
 
         issue_id = self._extract_issue_id(question)
+        if issue_id:
+            self.session_memory.current_issue = issue_id
+        else:
+            issue_id = self.session_memory.current_issue
         if not issue_id:
             answer = "No Jira ticket found in question"
             if self.use_memory and self.memory is not None:
                 self.memory.chat_memory.add_ai_message(answer)
+            self.session_memory.save_context({"input": question}, {"output": answer})
             return answer
 
         if self._should_validate(question, **kwargs):
@@ -172,6 +178,7 @@ class RouterAgent:
             answer = self._classify_and_validate(issue_id, **kwargs)
             if self.use_memory and self.memory is not None:
                 self.memory.chat_memory.add_ai_message(answer)
+            self.session_memory.save_context({"input": question}, {"output": answer})
             return answer
 
         logger.info("Routing to general insights workflow")
@@ -193,6 +200,7 @@ class RouterAgent:
         )
         if self.use_memory and self.memory is not None:
             self.memory.chat_memory.add_ai_message(answer)
+        self.session_memory.save_context({"input": question}, {"output": answer})
         return answer
 
 
