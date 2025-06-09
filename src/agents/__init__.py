@@ -11,6 +11,7 @@ logger.info(
 from .classifier import ClassifierAgent
 from .api_validator import ApiValidatorAgent
 from .issue_insights import IssueInsightsAgent
+from .router_agent import RouterAgent
 
-__all__ = ["ClassifierAgent", "ApiValidatorAgent", "IssueInsightsAgent"]
+__all__ = ["ClassifierAgent", "ApiValidatorAgent", "IssueInsightsAgent", "RouterAgent"]
 
