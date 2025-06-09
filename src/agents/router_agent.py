@@ -49,14 +49,17 @@ class RouterAgent:
         return None
 
     def _should_validate(self, question: str, **kwargs: Any) -> bool:
-        if self.router_prompt:
-            prompt = safe_format(self.router_prompt, {"question": question})
-        else:
-            prompt = f"Is this question asking for API validation? {question}"
-        label = self.classifier.classify(prompt, **kwargs)
-        result = str(label).strip().upper().startswith("VALIDATE")
-        logger.debug("Should validate: %s (label=%s)", result, label)
-        return result
+        """Return ``True`` if ``question`` explicitly requests validation."""
+        lowered = question.lower()
+        explicit_phrases = [
+            r"\bvalidate\s+this\s+jira\b",
+            r"\btest\s+this\s+jira\b",
+        ]
+        for pattern in explicit_phrases:
+            if re.search(pattern, lowered):
+                logger.debug("Explicit validation phrase detected: %s", pattern)
+                return True
+        return False
 
     def _needs_history(self, question: str, **kwargs: Any) -> bool:
         """Return True if the LLM determines the changelog is required."""

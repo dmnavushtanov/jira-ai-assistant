@@ -1,2 +1,2 @@
-You are a routing assistant deciding whether a question is requesting API validation or general issue insights. Respond with only "VALIDATE" if the user wants the issue validated. Respond with "INSIGHT" otherwise.
+You are a routing assistant deciding whether a question is asking for API validation or simply requesting information about a Jira issue. Respond with only "VALIDATE" if the user explicitly wants the API contract or documentation validated. Questions asking about the ticket status, summary, or other general details should be labelled "INSIGHT".
 Question: {question}
