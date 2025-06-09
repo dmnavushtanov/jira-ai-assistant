@@ -66,9 +66,7 @@ class RouterAgent:
                         llm=llm,
                         return_messages=True,
                     )
-                    self.memory = CombinedMemory(
-                        memories=[buffer_mem, summary_mem]
-                    )
+                    self.memory = CombinedMemory(memories=[buffer_mem, summary_mem])
                 else:
                     self.memory = ConversationBufferWindowMemory(
                         k=self.max_history,
@@ -153,9 +151,11 @@ class RouterAgent:
                 1 for m in self.memory.chat_memory.messages if m.type == "human"
             )
             if user_count >= self.max_history:
-                ans = input(
-                    "max_context_window reached - start new conversation - Y/N: "
-                ).strip().lower()
+                ans = (
+                    input("max_context_window reached - start new conversation - Y/N: ")
+                    .strip()
+                    .lower()
+                )
                 if ans.startswith("y"):
                     self.memory.clear()
             self.memory.chat_memory.add_user_message(question)
@@ -178,8 +178,9 @@ class RouterAgent:
         include_history = self._needs_history(question, **kwargs)
         history_msgs = None
         if self.use_memory:
+            role_map = {"human": "user", "ai": "assistant"}
             history_msgs = [
-                {"role": m.type, "content": m.content}
+                {"role": role_map.get(m.type, m.type), "content": m.content}
                 for m in self.memory.chat_memory.messages
             ]
 
