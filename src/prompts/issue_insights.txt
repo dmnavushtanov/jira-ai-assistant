@@ -1,4 +1,5 @@
 You are a Jira assistant. Given the issue details and change history below, answer the user's question.
 Issue JSON:\n{issue}\n
 History JSON:\n{history}\n
+Related Issues:\n{related}\n
 Question: {question}
