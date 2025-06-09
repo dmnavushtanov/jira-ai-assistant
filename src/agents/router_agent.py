@@ -83,6 +83,27 @@ class RouterAgent:
         self.router_prompt = load_prompt("router.txt")
         self.history_prompt = load_prompt("needs_history.txt")
 
+        try:
+            from langchain.chains.openai_moderation import OpenAIModerationChain
+            from langchain.security import PromptInjectionEvaluator
+        except Exception:  # pragma: no cover - optional dependency
+            OpenAIModerationChain = None
+            PromptInjectionEvaluator = None
+
+        if OpenAIModerationChain is not None:
+            self.moderation = OpenAIModerationChain()
+        else:
+            logger.warning("OpenAIModerationChain not available; moderation disabled")
+            self.moderation = None
+
+        if PromptInjectionEvaluator is not None:
+            self.injection_guard = PromptInjectionEvaluator()
+        else:
+            logger.warning(
+                "PromptInjectionEvaluator not available; injection checks disabled"
+            )
+            self.injection_guard = None
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -146,6 +167,27 @@ class RouterAgent:
     def ask(self, question: str, **kwargs: Any) -> str:
         """Route ``question`` to the appropriate workflow."""
         logger.info("Router received question: %s", question)
+
+        if self.moderation is not None:
+            try:
+                result = self.moderation.run(question)
+                flagged = getattr(result, "flagged", False)
+            except Exception:  # pragma: no cover - handle runtime issues
+                logger.exception("Moderation check failed")
+                flagged = False
+            if flagged:
+                logger.warning("OpenAI moderation flagged the question")
+                return "I can only answer questions about Jira issues."
+
+        if self.injection_guard is not None:
+            try:
+                dangerous = self.injection_guard.is_dangerous(question)
+            except Exception:  # pragma: no cover - handle runtime issues
+                logger.exception("Prompt injection check failed")
+                dangerous = False
+            if dangerous:
+                logger.warning("Potential prompt injection detected")
+                return "I can only answer questions about Jira issues."
 
         if self.use_memory and self.memory is not None:
             user_count = sum(
