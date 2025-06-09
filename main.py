@@ -1,15 +1,9 @@
 import os
 from dotenv import load_dotenv
 from src.jira_client import JiraClient
-import json
-from langchain.schema.runnable import RunnableLambda, RunnableSequence
 
-from src.agents.classifier import ClassifierAgent
-from src.agents.api_validator import ApiValidatorAgent
-from src.prompts import load_prompt
-from src.utils import safe_format
+from src.agents.router_agent import RouterAgent
 from src.configs import load_config, setup_logging
-from src.services.jira_service import get_issue_by_id_tool
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,56 +33,16 @@ def get_jira_client():
 
 def main() -> None:
     logger.info("Starting main interaction loop")
-    issue_id = input("Enter Jira issue ID: ").strip()
+    question = input("Enter your question: ").strip()
 
-    logger.debug("Instantiating agents")
-    classifier = ClassifierAgent()
-    validator = ApiValidatorAgent()
-
-    def classify_step(iid: str) -> dict:
-        logger.debug("Fetching issue %s", iid)
-        issue_json = get_issue_by_id_tool.run(iid)
-        issue = json.loads(issue_json)
-
-        logger.info("Issue found: %s", issue.get("key"))
-        fields = issue.get("fields", {})
-        project = fields.get("project", {})
-        logger.debug(
-            "Project: %s - %s | Summary: %s | Status: %s",
-            project.get("key"),
-            project.get("name"),
-            fields.get("summary"),
-            fields.get("status", {}).get("name"),
-        )
-
-        prompt = safe_format(
-            load_prompt("classifier.txt"),
-            {
-                "summary": fields.get('summary', ''),
-                "description": fields.get('description', ''),
-            },
-        )
-        classification = classifier.classify(prompt)
-        logger.info("Classification: %s", classification)
-        return {"issue": issue, "classification": classification}
-
-    def validate_step(data: dict) -> str:
-        if str(data.get("classification", "")).upper().startswith("API"):
-            logger.debug("Issue classified as API related; validating")
-            return validator.validate(data["issue"])
-        logger.debug("Issue not API related; skipping validation")
-        return "Validation skipped (not API related)"
-
-    sequence = RunnableSequence(
-        first=RunnableLambda(classify_step),
-        last=RunnableLambda(validate_step),
-    )
+    logger.debug("Instantiating RouterAgent")
+    router = RouterAgent()
 
     try:
-        result = sequence.invoke(issue_id)
-        logger.info("Validation result: %s", result)
-    except Exception as exc:
-        logger.exception("Error during validation")
+        answer = router.ask(question)
+        logger.info("Agent response: %s", answer)
+    except Exception:
+        logger.exception("Error processing question")
 
 
 if __name__ == "__main__":
