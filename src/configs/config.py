@@ -4,6 +4,14 @@ import logging
 import yaml
 from dotenv import load_dotenv
 
+try:
+    from rich.logging import RichHandler
+    from rich.traceback import install as install_rich_traceback
+except Exception:  # pragma: no cover - rich not installed
+    RichHandler = None
+    def install_rich_traceback():
+        pass
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,10 +32,18 @@ class Config:
 def setup_logging(config: "Config") -> None:
     """Configure logging level based on ``config.debug``."""
     level = logging.DEBUG if config.debug else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    if RichHandler:
+        install_rich_traceback()
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[RichHandler(rich_tracebacks=True)],
+        )
+    else:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
     logger.debug("Logging initialized at level %s", logging.getLevelName(level))
 
 

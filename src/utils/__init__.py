@@ -2,5 +2,6 @@
 
 from .jira import extract_plain_text, JiraUtils
 from .prompt import safe_format
+from .rich_logger import RichLogger
 
-__all__ = ["extract_plain_text", "JiraUtils", "safe_format"]
+__all__ = ["extract_plain_text", "JiraUtils", "safe_format", "RichLogger"]

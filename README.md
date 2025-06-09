@@ -22,6 +22,10 @@ INCLUDE_WHOLE_API_BODY=false
 
 The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment. The flag `INCLUDE_WHOLE_API_BODY` controls whether validation prompts should return the full API bodies or only boolean indicators of their validity.
 
+### Debug Logging
+
+When `DEBUG=true` the application configures colored output using `rich`. Any tracebacks will also be displayed with syntax highlighting. The utility class `RichLogger` can be passed as a callback to LangChain components for detailed, step-by-step logs.
+
 ## Usage
 
 ### Router Agent CLI
