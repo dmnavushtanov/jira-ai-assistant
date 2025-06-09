@@ -47,10 +47,11 @@ class JiraClient:
         return JiraUtils.clean_issue(issue.raw)
 
     def get_changelog(self, issue_key: str) -> Dict[str, Any]:
-        """Return changelog for an issue."""
+        """Return cleaned changelog for an issue."""
         logger.debug("Fetching changelog for issue %s", issue_key)
         issue = self._jira.issue(issue_key, expand="changelog")
-        return issue.raw.get("changelog", {})
+        history = issue.raw.get("changelog", {})
+        return JiraUtils.clean_history(history)
 
     def search_issues(self, jql: str, **kwargs: Any) -> List[Dict[str, Any]]:
         """Run a JQL query and return the matching issues."""

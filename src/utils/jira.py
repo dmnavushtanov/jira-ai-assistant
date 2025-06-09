@@ -31,6 +31,15 @@ def extract_plain_text(content: Any) -> str:
 
 
 
+def strip_nulls(obj: Any) -> Any:
+    """Recursively remove keys with ``None`` values from dictionaries and lists."""
+    if isinstance(obj, dict):
+        return {k: strip_nulls(v) for k, v in obj.items() if v is not None}
+    if isinstance(obj, list):
+        return [strip_nulls(v) for v in obj if v is not None]
+    return obj
+
+
 class JiraUtils:
     """Helper methods for cleaning and parsing Jira issues."""
 
@@ -38,21 +47,21 @@ class JiraUtils:
 
     @classmethod
     def clean_fields(cls, fields: Dict[str, Any]) -> Dict[str, Any]:
-        """Return ``fields`` without ``None`` custom fields."""
+        """Return ``fields`` without ``None`` values."""
         if not isinstance(fields, dict):
             logger.debug("Fields is not a dict; returning as-is")
             return fields
-        logger.debug("Cleaning custom fields")
+        logger.debug("Cleaning fields and stripping nulls")
         cleaned = {
             k: v
             for k, v in fields.items()
-            if not (k.startswith(cls.CUSTOM_FIELD_PREFIX) and v is None)
+            if not k.startswith(cls.CUSTOM_FIELD_PREFIX)
         }
-        return cleaned
+        return strip_nulls(cleaned)
 
     @classmethod
     def clean_issue(cls, issue: Dict[str, Any]) -> Dict[str, Any]:
-        """Return ``issue`` with ``None`` custom fields removed."""
+        """Return ``issue`` with ``None`` values removed."""
         fields = issue.get("fields")
         if isinstance(fields, dict):
             logger.debug("Cleaning issue fields for %s", issue.get("key"))
@@ -60,7 +69,13 @@ class JiraUtils:
             if cleaned is not fields:
                 issue = dict(issue)
                 issue["fields"] = cleaned
-        return issue
+        return strip_nulls(issue)
+
+    @classmethod
+    def clean_history(cls, history: Dict[str, Any]) -> Dict[str, Any]:
+        """Return ``history`` with ``None`` values removed."""
+        logger.debug("Cleaning changelog")
+        return strip_nulls(history)
 
 
-__all__ = ["extract_plain_text", "JiraUtils"]
+__all__ = ["extract_plain_text", "strip_nulls", "JiraUtils"]

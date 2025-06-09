@@ -34,6 +34,7 @@ class RouterAgent:
             pattern = r"[A-Za-z][A-Za-z0-9]+"
         self.issue_re = re.compile(rf"(?:{pattern})-\d+", re.IGNORECASE)
         self.router_prompt = load_prompt("router.txt")
+        self.history_prompt = load_prompt("needs_history.txt")
 
     # ------------------------------------------------------------------
     # Helpers
@@ -55,6 +56,20 @@ class RouterAgent:
         label = self.classifier.classify(prompt, **kwargs)
         result = str(label).strip().upper().startswith("VALIDATE")
         logger.debug("Should validate: %s (label=%s)", result, label)
+        return result
+
+    def _needs_history(self, question: str, **kwargs: Any) -> bool:
+        """Return True if the LLM determines the changelog is required."""
+        if self.history_prompt:
+            prompt = safe_format(self.history_prompt, {"question": question})
+        else:
+            prompt = (
+                "Do we need the change history to answer this question? "
+                "Respond with HISTORY or NO_HISTORY.\nQuestion: " + question
+            )
+        label = self.classifier.classify(prompt, **kwargs)
+        result = str(label).strip().upper().startswith("HISTORY")
+        logger.debug("Needs history: %s (label=%s)", result, label)
         return result
 
     def _classify_and_validate(self, issue_id: str, **kwargs: Any) -> str:
@@ -90,7 +105,8 @@ class RouterAgent:
             return self._classify_and_validate(issue_id, **kwargs)
 
         logger.info("Routing to general insights workflow")
-        return self.insights.ask(issue_id, question, **kwargs)
+        include_history = self._needs_history(question, **kwargs)
+        return self.insights.ask(issue_id, question, include_history=include_history, **kwargs)
 
 
 __all__ = ["RouterAgent"]
