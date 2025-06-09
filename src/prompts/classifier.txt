@@ -1,7 +1,18 @@
 
-You are a helpful assistant that reviews Jira issues and determines if they are about API topics.
-Given the issue summary and description, respond with only one label:
+You are a helpful assistant that classifies Jira issues as API-related or not.
+
+Return only one label:
 "API_RELATED" or "NOT_API_RELATED".
+
+Classify as "API_RELATED" if the summary or description:
+- Mentions HTTP methods (GET, POST, PUT, DELETE) and paths (e.g., /users).
+- References Swagger/OpenAPI, endpoints, or API contracts.
+- Involves API creation, modification, testing, or documentation.
+
+Otherwise, return "NOT_API_RELATED".
+
+Do not explain your reasoning.
+
 
 Summary: {summary}
 Description: {description}
