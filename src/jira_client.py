@@ -67,16 +67,20 @@ class JiraClient:
         return [JiraUtils.clean_issue(iss.raw, strip_unused=self._strip_unused) for iss in issues]
 
     def get_related_issues(self, issue_key: str) -> Dict[str, List[Dict[str, Any]]]:
-        """Return subtasks and linked issues for the given ticket."""
+        """Return subtasks and linked issues for the given ticket.
+
+        Each returned issue also includes its comments under a ``comments`` key
+        since context from discussions can be important.
+        """
         logger.debug("Fetching related issues for %s", issue_key)
         issue = self._jira.issue(issue_key, expand="issuelinks,subtasks")
         subtasks: List[Dict[str, Any]] = []
         for sub in getattr(issue.fields, "subtasks", []):
             try:
                 sub_issue = self._jira.issue(sub.key)
-                subtasks.append(
-                    JiraUtils.clean_issue(sub_issue.raw, strip_unused=self._strip_unused)
-                )
+                cleaned = JiraUtils.clean_issue(sub_issue.raw, strip_unused=self._strip_unused)
+                cleaned["comments"] = self.get_comments(sub.key)
+                subtasks.append(cleaned)
             except Exception:
                 logger.exception("Failed to fetch subtask %s", getattr(sub, "key", ""))
         linked: List[Dict[str, Any]] = []
@@ -86,9 +90,9 @@ class JiraClient:
                 continue
             try:
                 other_issue = self._jira.issue(other.key)
-                linked.append(
-                    JiraUtils.clean_issue(other_issue.raw, strip_unused=self._strip_unused)
-                )
+                cleaned = JiraUtils.clean_issue(other_issue.raw, strip_unused=self._strip_unused)
+                cleaned["comments"] = self.get_comments(other.key)
+                linked.append(cleaned)
             except Exception:
                 logger.exception("Failed to fetch linked issue %s", getattr(other, "key", ""))
         return {"subtasks": subtasks, "linked_issues": linked}

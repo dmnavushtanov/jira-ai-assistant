@@ -32,7 +32,7 @@ Conversation memory can be enabled with `conversation_memory: true` in the same 
 The assistant also remembers the last Jira key you referenced. Follow-up questions can omit the key and it will use the stored value. Include the word `forget` in your message to clear this memory.
 
 Set `strip_unused_jira_data: true` in the config to remove avatar URLs and ID fields from Jira payloads for more concise outputs.
-Set `follow_related_jiras: true` to automatically fetch and summarize linked issues and subtasks when answering questions.
+Set `follow_related_jiras: true` to automatically fetch and summarize linked issues and subtasks when answering questions. Comments from those related tickets are also retrieved so important context isn't missed.
 
 ### Debug Logging
 
