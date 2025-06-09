@@ -28,12 +28,14 @@ class Config:
     projects: list[str]
     include_whole_api_body: bool
     langchain_debug: bool
+    rich_logging: bool
 
 
 def setup_logging(config: "Config") -> None:
     """Configure logging level based on ``config.debug``."""
     level = logging.DEBUG if config.debug else logging.INFO
-    if RichHandler:
+    use_rich = config.rich_logging and RichHandler is not None
+    if use_rich:
         install_rich_traceback()
         logging.basicConfig(
             level=level,
@@ -89,4 +91,5 @@ def load_config(path: str = None) -> Config:
         projects=[p.strip().upper() for p in os.getenv("PROJECTS", ",".join(data.get("projects", []))).split(",") if p.strip()] or [],
         include_whole_api_body=_env_bool("INCLUDE_WHOLE_API_BODY", data.get("include_whole_api_body", False)),
         langchain_debug=_env_bool("LANGCHAIN_DEBUG", data.get("langchain_debug", False)),
+        rich_logging=_env_bool("RICH_LOGGING", data.get("rich_logging", True)),
     )
