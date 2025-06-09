@@ -19,9 +19,6 @@ load_dotenv(override=True)
 # Load application configuration and configure logging
 config = load_config()
 setup_logging(config)
-if langchain:
-    langchain.debug = config.debug
-
 
 def get_jira_client():
     """Return a JiraClient instance using environment variables from .env file."""

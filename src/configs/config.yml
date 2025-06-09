@@ -9,3 +9,4 @@ projects:
   - SD
   - RA
 include_whole_api_body: false
+langchain_debug: false
