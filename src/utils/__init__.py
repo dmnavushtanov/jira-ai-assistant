@@ -1,7 +1,14 @@
 """Utility helpers for the Jira AI Assistant."""
 
-from .jira import extract_plain_text, JiraUtils, strip_nulls
+from .jira import extract_plain_text, JiraUtils, strip_nulls, strip_unused_jira_data
 from .prompt import safe_format
 from .rich_logger import RichLogger
 
-__all__ = ["extract_plain_text", "strip_nulls", "JiraUtils", "safe_format", "RichLogger"]
+__all__ = [
+    "extract_plain_text",
+    "strip_nulls",
+    "strip_unused_jira_data",
+    "JiraUtils",
+    "safe_format",
+    "RichLogger",
+]

@@ -20,11 +20,15 @@ BASE_LLM=openai  # or 'anthropic'
 INCLUDE_WHOLE_API_BODY=false
 LANGCHAIN_DEBUG=false
 RICH_LOGGING=true
+STRIP_UNUSED_JIRA_DATA=true
 ```
 
 The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment. The flag `INCLUDE_WHOLE_API_BODY` controls whether validation prompts should return the full API bodies or only boolean indicators of their validity.
 
+
 Conversation memory can be enabled with `conversation_memory: true` in the same file. The number of previous questions remembered defaults to three and can be adjusted via `max_questions_to_remember`. When LangChain is available the agent uses a `ConversationBufferWindowMemory` of size `k`. If `k` is greater than three the buffer is combined with `ConversationSummaryMemory` so older turns are summarized automatically. When the limit is reached you'll be prompted to start a new conversation.
+
+Set `strip_unused_jira_data: true` in the config to remove avatar URLs and ID fields from Jira payloads for more concise outputs.
 
 ### Debug Logging
 

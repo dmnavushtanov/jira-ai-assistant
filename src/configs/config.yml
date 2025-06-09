@@ -13,3 +13,4 @@ include_whole_api_body: false
 langchain_debug: false
 conversation_memory: false
 max_questions_to_remember: 3
+strip_unused_jira_data: true
