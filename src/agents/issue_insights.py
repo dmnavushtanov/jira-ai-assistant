@@ -69,7 +69,12 @@ class IssueInsightsAgent:
     # Public API
     # ------------------------------------------------------------------
     def ask(
-        self, issue_id: str, question: str, include_history: bool = True, **kwargs: Any
+        self,
+        issue_id: str,
+        question: str,
+        include_history: bool = True,
+        history: list[dict[str, str]] | None = None,
+        **kwargs: Any,
     ) -> str:
         """Answer ``question`` about ``issue_id`` using the configured LLM."""
         logger.info("Answering question for issue %s", issue_id)
@@ -91,7 +96,7 @@ class IssueInsightsAgent:
             )
         values = {"issue": issue_json, "history": history_json, "question": question}
         prompt = safe_format(prompt_template, values)
-        messages = [{"role": "user", "content": prompt}]
+        messages = (history or []) + [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         try:
             return response.choices[0].message.content.strip()
