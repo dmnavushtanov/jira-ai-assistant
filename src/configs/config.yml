@@ -14,3 +14,4 @@ langchain_debug: true
 conversation_memory: true
 max_questions_to_remember: 3
 strip_unused_jira_data: true
+follow_related_jiras: false

@@ -65,3 +65,30 @@ class JiraClient:
         logger.debug("Searching issues with JQL: %s", jql)
         issues = self._jira.search_issues(jql, **kwargs)
         return [JiraUtils.clean_issue(iss.raw, strip_unused=self._strip_unused) for iss in issues]
+
+    def get_related_issues(self, issue_key: str) -> Dict[str, List[Dict[str, Any]]]:
+        """Return subtasks and linked issues for the given ticket."""
+        logger.debug("Fetching related issues for %s", issue_key)
+        issue = self._jira.issue(issue_key, expand="issuelinks,subtasks")
+        subtasks: List[Dict[str, Any]] = []
+        for sub in getattr(issue.fields, "subtasks", []):
+            try:
+                sub_issue = self._jira.issue(sub.key)
+                subtasks.append(
+                    JiraUtils.clean_issue(sub_issue.raw, strip_unused=self._strip_unused)
+                )
+            except Exception:
+                logger.exception("Failed to fetch subtask %s", getattr(sub, "key", ""))
+        linked: List[Dict[str, Any]] = []
+        for link in getattr(issue.fields, "issuelinks", []):
+            other = getattr(link, "outwardIssue", None) or getattr(link, "inwardIssue", None)
+            if not other:
+                continue
+            try:
+                other_issue = self._jira.issue(other.key)
+                linked.append(
+                    JiraUtils.clean_issue(other_issue.raw, strip_unused=self._strip_unused)
+                )
+            except Exception:
+                logger.exception("Failed to fetch linked issue %s", getattr(other, "key", ""))
+        return {"subtasks": subtasks, "linked_issues": linked}

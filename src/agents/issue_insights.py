@@ -15,6 +15,7 @@ from src.utils import safe_format
 from src.services.jira_service import (
     get_issue_by_id_tool,
     get_issue_history_tool,
+    get_related_issues_tool,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,15 @@ class IssueInsightsAgent:
 
         self.summary_prompt = load_prompt("issue_summary.txt")
         self.insights_prompt = load_prompt("issue_insights.txt")
+
+    def _summarize_related(self, issues: list[dict[str, Any]], **kwargs: Any) -> str:
+        """Return summaries for a list of Jira issues."""
+        parts = []
+        for issue in issues:
+            fields = issue.get("fields", {})
+            summary = self._summarize(fields.get("summary", ""), fields.get("description", ""), **kwargs)
+            parts.append(f"{issue.get('key')}: {summary}")
+        return "\n".join(parts)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -81,21 +91,27 @@ class IssueInsightsAgent:
         logger.info("Answering question for issue %s", issue_id)
         issue_json = get_issue_by_id_tool.run(issue_id)
         history_json = get_issue_history_tool.run(issue_id) if include_history else ""
+        related_summary = ""
+        if self.config.follow_related_jiras:
+            related_json = get_related_issues_tool.run(issue_id)
+            related = json.loads(related_json)
+            all_related = related.get("subtasks", []) + related.get("linked_issues", [])
+            related_summary = self._summarize_related(all_related, **kwargs) if all_related else ""
 
         if include_history:
             prompt_template = self.insights_prompt or (
                 "You are a Jira assistant. Given the issue details and change history below, answer the user's question.\n"
-                "Issue JSON:\n{issue}\n\nHistory JSON:\n{history}\n\nQuestion: {question}"
+                "Issue JSON:\n{issue}\n\nHistory JSON:\n{history}\n\nRelated Issues:\n{related}\n\nQuestion: {question}"
             )
         else:
             prompt_template = (
                 self.insights_prompt
                 or (
                     "You are a Jira assistant. Given the issue details below, answer the user's question.\n"
-                    "Issue JSON:\n{issue}\n\nQuestion: {question}"
+                    "Issue JSON:\n{issue}\n\nRelated Issues:\n{related}\n\nQuestion: {question}"
                 )
             )
-        values = {"issue": issue_json, "history": history_json, "question": question}
+        values = {"issue": issue_json, "history": history_json, "question": question, "related": related_summary}
         prompt = safe_format(prompt_template, values)
         system_msg = {
             "role": "system",

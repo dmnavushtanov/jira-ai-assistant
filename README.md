@@ -21,6 +21,7 @@ INCLUDE_WHOLE_API_BODY=false
 LANGCHAIN_DEBUG=false
 RICH_LOGGING=true
 STRIP_UNUSED_JIRA_DATA=true
+FOLLOW_RELATED_JIRAS=false
 ```
 
 The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment. The flag `INCLUDE_WHOLE_API_BODY` controls whether validation prompts should return the full API bodies or only boolean indicators of their validity.
@@ -31,6 +32,7 @@ Conversation memory can be enabled with `conversation_memory: true` in the same 
 The assistant also remembers the last Jira key you referenced. Follow-up questions can omit the key and it will use the stored value. Include the word `forget` in your message to clear this memory.
 
 Set `strip_unused_jira_data: true` in the config to remove avatar URLs and ID fields from Jira payloads for more concise outputs.
+Set `follow_related_jiras: true` to automatically fetch and summarize linked issues and subtasks when answering questions.
 
 ### Debug Logging
 
