@@ -71,6 +71,10 @@ class ApiValidatorAgent:
             "summary": extract_plain_text(fields.get("summary")),
             "description": extract_plain_text(fields.get("description")),
             "status": status,
+            "body_instructions": (
+                "Include full request and response bodies" if self.config.include_whole_api_body
+                else "Do not include full bodies. Provide boolean fields `request_body_exists`, `request_body_valid`, `response_body_exists`, and `response_body_valid` and set the example fields to null."
+            ),
         }
         try:
             prompt = safe_format(template, values)

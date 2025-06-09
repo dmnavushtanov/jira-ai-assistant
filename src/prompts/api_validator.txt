@@ -11,6 +11,7 @@ ReadyforVerification: |
       (agents, clients, offices, employees, insurers, banks, experts, creditors and sales channels). 
       The result contains details for their role according to the filter criteria provided in the query parameters."
   4. Parse the "Summary" and "Description." Ignore Jira-specific color tags or images unless they carry URLs or JSON blocks.
+  {body_instructions}
   5. Return exactly one JSON object (no extra commentary) according to the schema below.
   
   **Output JSON Schema:**
@@ -23,10 +24,14 @@ ReadyforVerification: |
       "swagger_url": "string or null",
       "method": "POST" | "GET" | "PUT" | "DELETE" | null,
       "api_url": "string or null",
-      "request_body_example": {{ ... }} | null,
-      "response_example": {{ ... }} | null,
+        "request_body_exists": true | false,
+        "request_body_valid": true | false,
+        "response_body_exists": true | false,
+        "response_body_valid": true | false,
+        "request_body_example": {{ ... }} | null,
+        "response_example": {{ ... }} | null,
     }},
-    "jira_comment": "Natural-language summary of missing or malformed fields with specific example suggestions, appropriate to the development status."
+    "jira_comment": "Natural-language summary of missing or malformed fields with specific example suggestions, appropriate to the development status. If the request body exists but is invalid, mention it."
     }}
     ```
 
@@ -46,6 +51,7 @@ Backlog: |
       (agents, clients, offices, employees, insurers, banks, experts, creditors and sales channels). 
       The result contains details for their role according to the filter criteria provided in the query parameters."
   4. Parse the "Summary" and "Description." Ignore Jira-specific color tags or images unless they carry URLs or JSON blocks.
+  {body_instructions}
   5. Return exactly one JSON object (no extra commentary) according to the schema below.
   
   **Output JSON Schema:**
@@ -58,10 +64,14 @@ Backlog: |
       "swagger_url": "string or null",
       "method": "POST" | "GET" | "PUT" | "DELETE" | null,
       "api_url": "string or null",
-      "request_body_example": {{ ... }} | null,
-      "response_example": {{ ... }} | null,
+        "request_body_exists": true | false,
+        "request_body_valid": true | false,
+        "response_body_exists": true | false,
+        "response_body_valid": true | false,
+        "request_body_example": {{ ... }} | null,
+        "response_example": {{ ... }} | null,
     }},
-    "jira_comment": "Natural-language summary of missing or malformed fields with specific example suggestions, appropriate to the development status."
+    "jira_comment": "Natural-language summary of missing or malformed fields with specific example suggestions, appropriate to the development status. If the request body exists but is invalid, mention it."
     }}
     ```
 
@@ -83,6 +93,7 @@ InDevelopment: |
       - If it’s a GET or DELETE, explicitly set `"request_body_example": null`..
         **Instructions:**
   - Parse the "Summary" and "Description." Ignore Jira-specific color tags or images unless they carry URLs or JSON blocks.
+  {body_instructions}
   - Return exactly one JSON object (no extra commentary) according to the schema below.
 
   **Output JSON Schema:**
@@ -94,8 +105,12 @@ InDevelopment: |
       "swagger_url": "string or null",
       "method": "POST" | "GET" | "PUT" | "DELETE" | null,
       "api_url": "string or null",
-      "request_body_example": {{ ... }} | null,
-      "response_example": {{ ... }} | null
+        "request_body_exists": true | false,
+        "request_body_valid": true | false,
+        "response_body_exists": true | false,
+        "response_body_valid": true | false,
+        "request_body_example": {{ ... }} | null,
+        "response_example": {{ ... }} | null
     }}
   }}
   ```
@@ -129,6 +144,7 @@ Done: |
 
   **Instructions:**
   - Parse the "Summary" and "Description." Ignore Jira-specific color tags or images unless they carry URLs or JSON blocks.
+  {body_instructions}
   - Because the status is "Done," every required field must be valid. If a field is missing or inconsistent, set it to `null` and list a clear error.
   - For consistency against Swagger, you may assume the model can "fetch" or "know" the spec details when you include the URL. If you cannot verify programmatically, simply state in errors "Swagger check could not be completed."
   - Return exactly one JSON object (no extra commentary) according to the schema below.
@@ -142,8 +158,12 @@ Done: |
       "swagger_url": "string or null",
       "method": "POST" | "GET" | "PUT" | "DELETE" | null,
       "api_url": "string or null",
-      "request_body_example": {{ ... }} | null,
-      "response_example": {{ ... }} | null
+        "request_body_exists": true | false,
+        "request_body_valid": true | false,
+        "response_body_exists": true | false,
+        "response_body_valid": true | false,
+        "request_body_example": {{ ... }} | null,
+        "response_example": {{ ... }} | null
     }}
   }}
   ```

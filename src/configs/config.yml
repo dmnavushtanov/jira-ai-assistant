@@ -8,3 +8,4 @@ projects:
   - RB
   - SD
   - RA
+include_whole_api_body: false

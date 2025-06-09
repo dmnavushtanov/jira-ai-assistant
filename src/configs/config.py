@@ -18,6 +18,7 @@ class Config:
     anthropic_api_key: str
     anthropic_model: str
     projects: list[str]
+    include_whole_api_body: bool
 
 
 def setup_logging(config: "Config") -> None:
@@ -62,4 +63,5 @@ def load_config(path: str = None) -> Config:
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", data.get("anthropic_api_key", "")),
         anthropic_model=os.getenv("ANTHROPIC_MODEL", data.get("anthropic_model", "claude-3-opus")),
         projects=[p.strip().upper() for p in os.getenv("PROJECTS", ",".join(data.get("projects", []))).split(",") if p.strip()] or [],
+        include_whole_api_body=_env_bool("INCLUDE_WHOLE_API_BODY", data.get("include_whole_api_body", False)),
     )
