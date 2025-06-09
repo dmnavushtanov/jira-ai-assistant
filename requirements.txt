@@ -8,3 +8,6 @@ jira
 rich
 fastapi
 uvicorn
+langchain
+langchain-community
+langchain-openai
