@@ -69,3 +69,14 @@ python agent.py "List the issue details for PROJ-1"
 ```
 
 These examples require valid API keys for both OpenAI and Jira when using the respective features.
+
+### FastAPI Server
+
+A minimal FastAPI application is included to expose the assistant over HTTP. Start the server with:
+
+```bash
+uvicorn app:app --reload
+```
+
+The `/ask` endpoint accepts a JSON payload containing a `question` field and returns the answer from the `RouterAgent`.
+
