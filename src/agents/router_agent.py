@@ -28,6 +28,9 @@ from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
 from src.utils import safe_format, JiraContextMemory
 
+from jira import JIRAError
+from openai import OpenAIError
+
 logger = logging.getLogger(__name__)
 logger.debug("router_agent module loaded")
 
@@ -173,31 +176,39 @@ class RouterAgent:
             self.session_memory.save_context({"input": question}, {"output": answer})
             return answer
 
-        if self._should_validate(question, **kwargs):
-            logger.info("Routing to validation workflow")
-            answer = self._classify_and_validate(issue_id, **kwargs)
-            if self.use_memory and self.memory is not None:
-                self.memory.chat_memory.add_ai_message(answer)
-            self.session_memory.save_context({"input": question}, {"output": answer})
-            return answer
-
-        logger.info("Routing to general insights workflow")
-        include_history = self._needs_history(question, **kwargs)
-        history_msgs = None
-        if self.use_memory:
-            role_map = {"human": "user", "ai": "assistant"}
-            history_msgs = [
-                {"role": role_map.get(m.type, m.type), "content": m.content}
-                for m in self.memory.chat_memory.messages
-            ]
-
-        answer = self.insights.ask(
-            issue_id,
-            question,
-            include_history=include_history,
-            history=history_msgs,
-            **kwargs,
-        )
+        try:
+            if self._should_validate(question, **kwargs):
+                logger.info("Routing to validation workflow")
+                answer = self._classify_and_validate(issue_id, **kwargs)
+            else:
+                logger.info("Routing to general insights workflow")
+                include_history = self._needs_history(question, **kwargs)
+                history_msgs = None
+                if self.use_memory:
+                    role_map = {"human": "user", "ai": "assistant"}
+                    history_msgs = [
+                        {"role": role_map.get(m.type, m.type), "content": m.content}
+                        for m in self.memory.chat_memory.messages
+                    ]
+                answer = self.insights.ask(
+                    issue_id,
+                    question,
+                    include_history=include_history,
+                    history=history_msgs,
+                    **kwargs,
+                )
+        except JIRAError:
+            logger.exception("Jira error while fetching issue %s", issue_id)
+            answer = f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
+        except OpenAIError:
+            logger.exception("OpenAI API error")
+            answer = (
+                "I'm having trouble communicating with the language model right now. "
+                "Please try again later."
+            )
+        except Exception:
+            logger.exception("Unexpected error while processing question")
+            answer = "Sorry, something went wrong while handling your request."
         if self.use_memory and self.memory is not None:
             self.memory.chat_memory.add_ai_message(answer)
         self.session_memory.save_context({"input": question}, {"output": answer})

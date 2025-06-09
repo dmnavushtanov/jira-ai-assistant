@@ -90,3 +90,9 @@ uvicorn app:app --reload
 
 The `/ask` endpoint accepts a JSON payload containing a `question` field and returns the answer from the `RouterAgent`.
 
+### Error Handling
+
+The assistant now catches common issues such as invalid Jira keys or failures
+communicating with OpenAI. Instead of a stack trace you will receive a polite
+message explaining what went wrong so you can try again later.
+
