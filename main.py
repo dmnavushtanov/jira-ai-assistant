@@ -6,6 +6,11 @@ from src.agents.router_agent import RouterAgent
 from src.configs import load_config, setup_logging
 import logging
 
+try:
+    import langchain
+except Exception:  # pragma: no cover - langchain optional
+    langchain = None
+
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file (force reload)
@@ -14,6 +19,8 @@ load_dotenv(override=True)
 # Load application configuration and configure logging
 config = load_config()
 setup_logging(config)
+if langchain:
+    langchain.debug = config.debug
 
 
 def get_jira_client():
