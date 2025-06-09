@@ -97,3 +97,11 @@ The assistant now catches common issues such as invalid Jira keys or failures
 communicating with OpenAI. Instead of a stack trace you will receive a polite
 message explaining what went wrong so you can try again later.
 
+### Simple HTTP Client
+
+The ``SimpleHttpClient`` utility provides a minimal wrapper around
+``requests`` for quickly exercising external APIs.  It supports basic
+``get``, ``post``, ``put`` and ``delete`` helpers and can be initialized
+with an optional ``base_url``.  This makes it easy to experiment with new
+endpoints directly from Python without pulling in a larger framework.
+
