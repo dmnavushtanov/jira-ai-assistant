@@ -33,16 +33,22 @@ def get_jira_client():
 
 def main() -> None:
     logger.info("Starting main interaction loop")
-    question = input("Enter your question: ").strip()
 
     logger.debug("Instantiating RouterAgent")
     router = RouterAgent()
 
-    try:
-        answer = router.ask(question)
-        logger.info("Agent response: %s", answer)
-    except Exception:
-        logger.exception("Error processing question")
+    while True:
+        question = input("Enter your question (type 'exit' to quit): ").strip()
+        if question.lower() == "exit":
+            logger.info("Exiting interaction loop")
+            break
+
+        try:
+            answer = router.ask(question)
+            logger.info("Agent response: %s", answer)
+            print(answer)
+        except Exception:
+            logger.exception("Error processing question")
 
 
 if __name__ == "__main__":

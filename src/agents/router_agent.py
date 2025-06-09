@@ -86,8 +86,10 @@ class RouterAgent:
             return "No Jira ticket found in question"
 
         if self._should_validate(question, **kwargs):
+            logger.info("Routing to validation workflow")
             return self._classify_and_validate(issue_id, **kwargs)
 
+        logger.info("Routing to general insights workflow")
         return self.insights.ask(issue_id, question, **kwargs)
 
 
