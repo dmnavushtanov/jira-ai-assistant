@@ -31,6 +31,7 @@ class Config:
     rich_logging: bool
     conversation_memory: bool
     max_questions_to_remember: int
+    strip_unused_jira_data: bool
 
 
 def setup_logging(config: "Config") -> None:
@@ -105,4 +106,5 @@ def load_config(path: str = None) -> Config:
         rich_logging=_env_bool("RICH_LOGGING", data.get("rich_logging", True)),
         conversation_memory=_env_bool("CONVERSATION_MEMORY", data.get("conversation_memory", False)),
         max_questions_to_remember=_env_int("MAX_NUMBER_OF_QUESTIONS_TO_REMEMBER", data.get("max_questions_to_remember", 3)),
+        strip_unused_jira_data=_env_bool("STRIP_UNUSED_JIRA_DATA", data.get("strip_unused_jira_data", False)),
     )

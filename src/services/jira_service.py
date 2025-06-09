@@ -5,6 +5,7 @@ from typing import Dict, Any
 from langchain.tools import Tool
 
 from src.jira_client import JiraClient
+from src.configs.config import load_config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def _get_jira_client() -> JiraClient:
     """Instantiate a :class:`JiraClient` using environment variables."""
+    cfg = load_config()
     base_url = os.getenv("JIRA_BASE_URL")
     email = os.getenv("JIRA_EMAIL")
     token = os.getenv("JIRA_API_TOKEN")
@@ -21,7 +23,7 @@ def _get_jira_client() -> JiraClient:
         )
     logger.debug("Creating JiraClient for base_url=%s email=%s", base_url, email)
     logger.info("JiraClient initialized for %s", base_url)
-    return JiraClient(base_url, email, token)
+    return JiraClient(base_url, email, token, strip_unused_payload=cfg.strip_unused_jira_data)
 
 
 # --- Tool for getting issue details by ID ---
