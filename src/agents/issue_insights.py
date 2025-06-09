@@ -8,8 +8,7 @@ from typing import Any, Dict
 from datetime import datetime
 
 from src.configs.config import load_config
-from src.llm_clients.openai_client import OpenAIClient
-from src.llm_clients.claude_client import ClaudeClient
+from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
 from src.utils import safe_format
 from src.services.jira_service import (
@@ -29,16 +28,7 @@ class IssueInsightsAgent:
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing IssueInsightsAgent with config_path=%s", config_path)
         self.config = load_config(config_path)
-        llm = self.config.base_llm.lower()
-        if llm == "openai":
-            logger.debug("Using OpenAIClient")
-            self.client = OpenAIClient(config_path)
-        elif llm in {"anthropic", "claude"}:
-            logger.debug("Using ClaudeClient")
-            self.client = ClaudeClient(config_path)
-        else:
-            logger.error("Unsupported LLM provider: %s", self.config.base_llm)
-            raise ValueError(f"Unsupported LLM provider: {self.config.base_llm}")
+        self.client = create_llm_client(config_path)
 
         # Tools available to this agent
         self.tools = [get_issue_by_id_tool, get_issue_history_tool]
