@@ -6,3 +6,5 @@ requests
 gradio
 jira
 rich
+fastapi
+uvicorn
