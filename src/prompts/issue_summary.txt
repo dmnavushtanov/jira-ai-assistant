@@ -1,3 +1,4 @@
 Provide a short, one or two sentence summary of the following Jira issue.
 Summary: {summary}
 Description: {description}
+Comments: {comments}

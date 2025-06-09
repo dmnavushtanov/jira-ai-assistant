@@ -124,7 +124,11 @@ get_issue_history_tool = Tool(
 # --- Tool for fetching subtasks and linked issues ---
 
 def get_related_issues_func(issue_id: str) -> str:
-    """Return subtasks and linked issues for the given ticket."""
+    """Return subtasks and linked issues for the given ticket.
+
+    Each related issue will include its comments since they often provide
+    valuable context.
+    """
     logger.debug("Fetching related issues for %s", issue_id)
     client = _get_jira_client()
     related = client.get_related_issues(issue_id)
@@ -135,7 +139,10 @@ def get_related_issues_func(issue_id: str) -> str:
 get_related_issues_tool = Tool(
     name="get_related_issues",
     func=get_related_issues_func,
-    description="Return linked issues and subtasks for a Jira issue key as JSON.",
+    description=(
+        "Return linked issues and subtasks for a Jira issue key as JSON. "
+        "Comments from those issues are included."
+    ),
 )
 
 # --- Tool for adding a comment to an issue ---

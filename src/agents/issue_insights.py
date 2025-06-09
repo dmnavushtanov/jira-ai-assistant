@@ -16,6 +16,7 @@ from src.services.jira_service import (
     get_issue_by_id_tool,
     get_issue_history_tool,
     get_related_issues_tool,
+    get_issue_comments_tool,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,13 @@ class IssueInsightsAgent:
         parts = []
         for issue in issues:
             fields = issue.get("fields", {})
-            summary = self._summarize(fields.get("summary", ""), fields.get("description", ""), **kwargs)
+            comments = "\n".join(c.get("body", "") for c in issue.get("comments", []))
+            summary = self._summarize(
+                fields.get("summary", ""),
+                fields.get("description", ""),
+                comments,
+                **kwargs,
+            )
             parts.append(f"{issue.get('key')}: {summary}")
         return "\n".join(parts)
 
@@ -58,13 +65,20 @@ class IssueInsightsAgent:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _summarize(self, summary: str, description: str, **kwargs: Any) -> str:
-        """Return a short summary of the issue using the configured LLM."""
+    def _summarize(self, summary: str, description: str, comments: str = "", **kwargs: Any) -> str:
+        """Return a short summary of the issue using the configured LLM.
+
+        The ``comments`` field allows providing additional context from the
+        discussion on the ticket.
+        """
         template = self.summary_prompt or (
             "Provide a short, one or two sentence summary of the following Jira issue.\n"
-            "Summary: {summary}\nDescription: {description}"
+            "Summary: {summary}\nDescription: {description}\nComments: {comments}"
         )
-        prompt = safe_format(template, {"summary": summary, "description": description})
+        prompt = safe_format(
+            template,
+            {"summary": summary, "description": description, "comments": comments},
+        )
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         try:
@@ -134,7 +148,15 @@ class IssueInsightsAgent:
         issue_json = get_issue_by_id_tool.run(issue_id)
         issue = json.loads(issue_json)
         fields = issue.get("fields", {})
-        return self._summarize(fields.get("summary", ""), fields.get("description", ""), **kwargs)
+        comments_json = get_issue_comments_tool.run(issue_id)
+        comments_list = json.loads(comments_json)
+        comments = "\n".join(c.get("body", "") for c in comments_list)
+        return self._summarize(
+            fields.get("summary", ""),
+            fields.get("description", ""),
+            comments,
+            **kwargs,
+        )
 
 
 __all__ = ["IssueInsightsAgent"]
