@@ -25,6 +25,14 @@ class JiraOperationsAgent:
         logger.debug("Initializing JiraOperationsAgent with config_path=%s", config_path)
         self.config = load_config(config_path)
 
+        # Tools available to this agent
+        self.tools = [
+            add_comment_to_issue_tool,
+            create_jira_issue_tool,
+            fill_field_by_label_tool,
+            update_issue_fields_tool,
+        ]
+
     def add_comment(self, issue_id: str, comment: str, **kwargs: Any) -> str:
         """Add ``comment`` to ``issue_id`` using the Jira API."""
         logger.info("Adding comment to %s", issue_id)
