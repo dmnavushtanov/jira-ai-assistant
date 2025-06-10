@@ -223,28 +223,30 @@ class RouterAgent:
                 )
         return False
 
-    def _generate_test_cases(self, result: str, **kwargs: Any) -> str | None:
-        """Return test cases string if validation ``result`` is sufficient."""
+    def _generate_test_cases(self, result: str, **kwargs: Any) -> str:
+        """Return test cases string generated from ``result``."""
         try:
             data = json.loads(result)
         except Exception:
             data = parse_json_block(result)
-        if not isinstance(data, dict):
-            return None
-        is_valid = data.get("is_valid")
+
         method = None
-        parsed = data.get("parsed")
-        if isinstance(parsed, dict):
-            method = parsed.get("method")
-        if is_valid and method:
+        if isinstance(data, dict):
+            parsed = data.get("parsed")
+            if isinstance(parsed, dict):
+                method = parsed.get("method")
+
+        try:
             return self.tester.create_test_cases(result, method, **kwargs)
-        return None
+        except Exception:
+            logger.exception("Failed to generate test cases")
+            return "Not enough information to generate test cases."
 
     def _validate_and_generate_tests(self, issue_id: str, **kwargs: Any) -> str:
         """Run validation and return generated test cases if possible."""
         validation = self._classify_and_validate(issue_id, **kwargs)
         tests = self._generate_test_cases(validation, **kwargs)
-        return tests or validation
+        return tests
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -272,47 +274,48 @@ class RouterAgent:
             self.session_memory.current_issue = issue_id
         else:
             issue_id = self.session_memory.current_issue
-        if not issue_id:
-            answer = "No Jira ticket found in question"
-            if self.use_memory and self.memory is not None:
-                self.memory.chat_memory.add_ai_message(answer)
-            self.session_memory.save_context({"input": question}, {"output": answer})
-            return answer
 
         try:
             intent = self._classify_intent(question, **kwargs)
-            if intent.startswith("VALIDATE"):
-                logger.info("Routing to validation workflow")
-                answer = self._classify_and_validate(issue_id, **kwargs)
-                comment_posted = self._handle_validation_result(issue_id, answer)
-                if comment_posted:
-                    answer += "\n\nValidation summary posted as a Jira comment."
-                tests = self._generate_test_cases(answer, **kwargs)
-                if tests:
-                    answer += "\n\n" + tests
-            elif intent.startswith("TEST"):
-                logger.info("Routing to test generation workflow")
-                answer = self._validate_and_generate_tests(issue_id, **kwargs)
-            elif intent.startswith("OPERATE"):
+            if intent.startswith("OPERATE"):
                 logger.info("Routing to operations workflow")
-                answer = "Operation handling not implemented"
+                answer = self.operations.operate(question, issue_id=issue_id, **kwargs)
             else:
-                logger.info("Routing to general insights workflow")
-                include_history = self._needs_history(question, **kwargs)
-                history_msgs = None
-                if self.use_memory:
-                    role_map = {"human": "user", "ai": "assistant"}
-                    history_msgs = [
-                        {"role": role_map.get(m.type, m.type), "content": m.content}
-                        for m in self.memory.chat_memory.messages
-                    ]
-                answer = self.insights.ask(
-                    issue_id,
-                    question,
-                    include_history=include_history,
-                    history=history_msgs,
-                    **kwargs,
-                )
+                if not issue_id:
+                    answer = "No Jira ticket found in question"
+                    if self.use_memory and self.memory is not None:
+                        self.memory.chat_memory.add_ai_message(answer)
+                    self.session_memory.save_context({"input": question}, {"output": answer})
+                    return answer
+                if intent.startswith("VALIDATE"):
+                    logger.info("Routing to validation workflow")
+                    answer = self._classify_and_validate(issue_id, **kwargs)
+                    comment_posted = self._handle_validation_result(issue_id, answer)
+                    if comment_posted:
+                        answer += "\n\nValidation summary posted as a Jira comment."
+                    tests = self._generate_test_cases(answer, **kwargs)
+                    if tests:
+                        answer += "\n\n" + tests
+                elif intent.startswith("TEST"):
+                    logger.info("Routing to test generation workflow")
+                    answer = self._validate_and_generate_tests(issue_id, **kwargs)
+                else:
+                    logger.info("Routing to general insights workflow")
+                    include_history = self._needs_history(question, **kwargs)
+                    history_msgs = None
+                    if self.use_memory:
+                        role_map = {"human": "user", "ai": "assistant"}
+                        history_msgs = [
+                            {"role": role_map.get(m.type, m.type), "content": m.content}
+                            for m in self.memory.chat_memory.messages
+                        ]
+                    answer = self.insights.ask(
+                        issue_id,
+                        question,
+                        include_history=include_history,
+                        history=history_msgs,
+                        **kwargs,
+                    )
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
             answer = f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
