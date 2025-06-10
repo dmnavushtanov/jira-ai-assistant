@@ -61,10 +61,9 @@ class IssueInsightsAgent:
         The ``comments`` field allows providing additional context from the
         discussion on the ticket.
         """
-        template = self.summary_prompt or (
-            "Provide a short, one or two sentence summary of the following Jira issue.\n"
-            "Summary: {summary}\nDescription: {description}\nComments: {comments}"
-        )
+        if not self.summary_prompt:
+            raise RuntimeError("Summary prompt template missing")
+        template = self.summary_prompt
         prompt = safe_format(
             template,
             {"summary": summary, "description": description, "comments": comments},
@@ -102,19 +101,12 @@ class IssueInsightsAgent:
             all_related = related.get("subtasks", []) + related.get("linked_issues", [])
             related_summary = self._summarize_related(all_related, **kwargs) if all_related else ""
 
+        if not self.insights_prompt:
+            raise RuntimeError("Insights prompt template missing")
         if include_history:
-            prompt_template = self.insights_prompt or (
-                "You are a Jira assistant. Given the issue details and change history below, answer the user's question.\n"
-                "Issue JSON:\n{issue}\n\nHistory JSON:\n{history}\n\nRelated Issues:\n{related}\n\nQuestion: {question}"
-            )
+            prompt_template = self.insights_prompt
         else:
-            prompt_template = (
-                self.insights_prompt
-                or (
-                    "You are a Jira assistant. Given the issue details below, answer the user's question.\n"
-                    "Issue JSON:\n{issue}\n\nRelated Issues:\n{related}\n\nQuestion: {question}"
-                )
-            )
+            prompt_template = self.insights_prompt
         values = {"issue": issue_json, "history": history_json, "question": question, "related": related_summary}
         prompt = safe_format(prompt_template, values)
         system_msg = {
