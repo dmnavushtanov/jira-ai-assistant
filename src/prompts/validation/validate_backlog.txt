@@ -12,6 +12,7 @@ Check if ticket has enough detail for a developer to start work
 Business requirements must be specific to this feature
 All referenced URLs should be properly formatted
 Ignore Jira formatting unless it contains useful links or data
+Summarize business logic into 1-2 clear, concise sentences
 
 Output Format:
 Return only a JSON object with this structure:
@@ -23,7 +24,7 @@ json{
     "swagger_url": "string or null",
     "method": "POST|GET|PUT|DELETE or null",
     "api_endpoint": "string or null",
-    "business_logic": "string or null"
+    "business_logic": "string or null (1-2 sentences max)"
   },
   "jira_comment": "Summary of what's missing or unclear for development, with specific suggestions"
 }
