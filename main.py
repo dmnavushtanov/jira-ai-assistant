@@ -53,7 +53,7 @@ def _interactive_validate(
 
     issue_id = router._extract_issue_id(question or "") if question else None
     if not issue_id:
-        issue_id = input("Jira issue key: ").strip()
+        issue_id = input("Please enter the Jira issue key: ").strip()
     if not issue_id:
         print("No issue id provided, aborting.")
         return
@@ -61,10 +61,14 @@ def _interactive_validate(
     result = router._classify_and_validate(issue_id)
     print("\nValidation result:\n", result)
 
-    ans = input("Add this validation result as a Jira comment? [y/N]: ").strip().lower()
+    ans = input(
+        "Would you like me to post this validation result as a comment on Jira? (y/N): "
+    ).strip().lower()
     comment = result
     if not ans.startswith("y"):
-        correction = input("Enter alternative comment or press Enter to skip: ").strip()
+        correction = input(
+            "No problem. If you'd prefer a different comment, type it now or just press Enter to skip: "
+        ).strip()
         if correction:
             comment = correction
         else:
@@ -77,7 +81,9 @@ def _interactive_validate(
             logger.exception("Failed to add comment: %s", exc)
             print("Failed to add comment.")
 
-    ans = input("Create test cases based on this validation? [y/N]: ").strip().lower()
+    ans = input(
+        "Would you like me to create test cases based on this validation result? (y/N): "
+    ).strip().lower()
     if ans.startswith("y"):
         cases = tester.create_test_cases(result)
         print("\nGenerated test cases:\n", cases)
