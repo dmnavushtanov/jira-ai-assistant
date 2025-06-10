@@ -78,7 +78,17 @@ class ApiValidatorAgent:
             logger.exception("Failed to format prompt")
             return ""
         logger.debug("Prompt for validation: %s", prompt)
-        messages = [{"role": "user", "content": prompt}]
+        messages = []
+        if "Issue Details:" in prompt:
+            system_prompt, issue_prompt = prompt.split("Issue Details:", 1)
+            messages.append({"role": "system", "content": system_prompt.strip()})
+            messages.append({"role": "user", "content": "Issue Details:" + issue_prompt.strip()})
+        elif "Issue Key:" in prompt:
+            system_prompt, issue_prompt = prompt.split("Issue Key:", 1)
+            messages.append({"role": "system", "content": system_prompt.strip()})
+            messages.append({"role": "user", "content": "Issue Key:" + issue_prompt.strip()})
+        else:
+            messages.append({"role": "system", "content": prompt})
         response = self.client.chat_completion(messages, **kwargs)
         try:
             result = response.choices[0].message.content.strip()

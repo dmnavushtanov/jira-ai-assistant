@@ -5,6 +5,7 @@ from .prompt import safe_format
 from .rich_logger import RichLogger
 from .context_memory import JiraContextMemory
 from .http_client import SimpleHttpClient
+from .json_utils import parse_json_block
 
 __all__ = [
     "extract_plain_text",
@@ -15,4 +16,5 @@ __all__ = [
     "RichLogger",
     "JiraContextMemory",
     "SimpleHttpClient",
+    "parse_json_block",
 ]
