@@ -13,6 +13,9 @@ from src.services.jira_service import (
     update_issue_fields_tool,
 )
 from src.configs.config import load_config
+from src.llm_clients import create_llm_client
+from src.prompts import load_prompt
+from src.utils import safe_format, parse_json_block
 
 logger = logging.getLogger(__name__)
 logger.debug("jira_operations module loaded")
@@ -24,6 +27,7 @@ class JiraOperationsAgent:
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing JiraOperationsAgent with config_path=%s", config_path)
         self.config = load_config(config_path)
+        self.client = create_llm_client(config_path)
 
         # Tools available to this agent
         self.tools = [
@@ -32,6 +36,8 @@ class JiraOperationsAgent:
             fill_field_by_label_tool,
             update_issue_fields_tool,
         ]
+
+        self.plan_prompt = load_prompt("jira_operations.txt")
 
     def add_comment(self, issue_id: str, comment: str, **kwargs: Any) -> str:
         """Add ``comment`` to ``issue_id`` using the Jira API."""
@@ -84,6 +90,81 @@ class JiraOperationsAgent:
         except Exception:
             logger.debug("Failed to parse fill_field_by_label response")
             return result_json
+
+    # ------------------------------------------------------------------
+    # Natural language operation handling
+    # ------------------------------------------------------------------
+    def _plan_operation(self, question: str, issue_id: str | None = None, **kwargs: Any) -> dict[str, Any]:
+        """Return an action plan dict for ``question`` using the LLM."""
+        template = self.plan_prompt or (
+            "Convert the user request into a JSON action. Current issue: {issue_id}.\n"
+            "Supported actions: add_comment, create_issue, fill_field_by_label, update_fields.\n"
+            "Request: {question}"
+        )
+        prompt = safe_format(template, {"question": question, "issue_id": issue_id or ""})
+        messages = [{"role": "user", "content": prompt}]
+        response = self.client.chat_completion(messages, **kwargs)
+        try:
+            text = response.choices[0].message.content.strip()
+        except Exception:
+            try:
+                text = response["choices"][0]["message"]["content"].strip()
+            except Exception:
+                logger.exception("Failed to parse planning response")
+                return {"action": "unknown"}
+        plan = parse_json_block(text)
+        if isinstance(plan, dict):
+            return plan
+        logger.debug("Plan not JSON: %s", text)
+        return {"action": "unknown"}
+
+    def operate(self, question: str, issue_id: str | None = None, **kwargs: Any) -> str:
+        """Execute an operation described by ``question``."""
+        plan = self._plan_operation(question, issue_id=issue_id, **kwargs)
+        action = str(plan.get("action", "unknown")).lower()
+        try:
+            if action == "add_comment":
+                issue = plan.get("issue_id") or issue_id
+                comment = plan.get("comment")
+                if not issue or not comment:
+                    return "Missing issue_id or comment for add_comment"
+                result = self.add_comment(str(issue), str(comment), **kwargs)
+                return json.dumps(result)
+            if action == "create_issue":
+                summary = plan.get("summary")
+                description = plan.get("description")
+                project_key = plan.get("project_key")
+                issue_type = plan.get("issue_type", "Task")
+                if not summary or not description or not project_key:
+                    return "Missing parameters for create_issue"
+                result = self.create_issue(
+                    str(summary),
+                    str(description),
+                    str(project_key),
+                    str(issue_type),
+                    **kwargs,
+                )
+                return json.dumps(result)
+            if action == "update_fields":
+                issue = plan.get("issue_id") or issue_id
+                fields = plan.get("fields")
+                if not issue or not fields:
+                    return "Missing issue_id or fields for update_fields"
+                fields_json = json.dumps(fields)
+                result = self.update_fields(str(issue), fields_json, **kwargs)
+                return json.dumps(result)
+            if action == "fill_field_by_label":
+                issue = plan.get("issue_id") or issue_id
+                label = plan.get("field_label")
+                value = plan.get("value")
+                if not issue or not label:
+                    return "Missing issue_id or field_label for fill_field_by_label"
+                result = self.fill_field_by_label(str(issue), str(label), str(value), **kwargs)
+                return json.dumps(result)
+        except Exception:
+            logger.exception("Failed to execute operation")
+            return "Error performing Jira operation"
+        return "Unknown operation"
 
 
 __all__ = ["JiraOperationsAgent"]
