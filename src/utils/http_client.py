@@ -17,6 +17,19 @@ class SimpleHttpClient:
         self.session = requests.Session()
         logger.debug("SimpleHttpClient initialized with base_url=%s", self.base_url)
 
+    # ------------------------------------------------------------------
+    # Context manager
+    # ------------------------------------------------------------------
+    def __enter__(self) -> "SimpleHttpClient":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Close the underlying :class:`requests.Session`."""
+        self.session.close()
+
     def _build_url(self, path: str) -> str:
         if path.startswith("http://") or path.startswith("https://"):
             return path

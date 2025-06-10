@@ -9,6 +9,7 @@ def parse_json_block(text: str) -> Optional[Any]:
     """Return parsed JSON from ``text`` which may include markdown fences."""
     if not isinstance(text, str):
         return None
+
     cleaned = text.strip()
     if cleaned.startswith("```") and cleaned.endswith("```"):
         cleaned = cleaned.strip("`")

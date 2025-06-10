@@ -73,9 +73,9 @@ class TestAgent:
     ) -> str:
         """Return test cases based on ``validation_result`` and HTTP ``method``."""
         method = (method or self._extract_method(validation_result) or "GET").upper()
-        template = self.prompts.get(method) or self.default_prompt or (
-            "Generate test cases based on the following validation summary:\n{summary}"
-        )
+        template = self.prompts.get(method) or self.default_prompt
+        if not template:
+            raise RuntimeError("Test case generation prompt not found")
         prompt = safe_format(template, {"summary": validation_result})
         logger.info("Generating test cases from validation result")
         messages = [{"role": "user", "content": prompt}]
