@@ -27,7 +27,7 @@ from src.agents.api_validator import ApiValidatorAgent
 from src.agents.jira_operations import JiraOperationsAgent
 from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
-from src.utils import safe_format, JiraContextMemory
+from src.utils import safe_format, JiraContextMemory, parse_json_block
 
 from jira import JIRAError
 from openai import OpenAIError
@@ -155,10 +155,13 @@ class RouterAgent:
         """
         try:
             data = json.loads(result)
-            comment = data.get("jira_comment")
         except Exception:
+            data = parse_json_block(result)
+        if data is None:
             logger.debug("Validation result not JSON")
             comment = None
+        else:
+            comment = data.get("jira_comment") if isinstance(data, dict) else None
         if comment:
             if not self.config.write_comments_to_jira:
                 logger.info(
