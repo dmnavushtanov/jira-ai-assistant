@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from src.jira_client import JiraClient
 
 from src.agents.router_agent import RouterAgent
+from src.agents.test_agent import TestAgent
 from src.configs import load_config, setup_logging
 import logging
 
@@ -45,11 +46,49 @@ def get_jira_client():
     return JiraClient(base_url, email, token)
 
 
+def _interactive_validate(
+    router: RouterAgent, tester: TestAgent, question: str | None = None
+) -> None:
+    """Run a validation workflow with optional comment posting and tests."""
+
+    issue_id = router._extract_issue_id(question or "") if question else None
+    if not issue_id:
+        issue_id = input("Jira issue key: ").strip()
+    if not issue_id:
+        print("No issue id provided, aborting.")
+        return
+
+    result = router._classify_and_validate(issue_id)
+    print("\nValidation result:\n", result)
+
+    ans = input("Add this validation result as a Jira comment? [y/N]: ").strip().lower()
+    comment = result
+    if not ans.startswith("y"):
+        correction = input("Enter alternative comment or press Enter to skip: ").strip()
+        if correction:
+            comment = correction
+        else:
+            comment = ""
+    if comment:
+        try:
+            router.operations.add_comment(issue_id, comment)
+            print(f"Comment added to {issue_id}.")
+        except Exception as exc:  # pragma: no cover - interactive use
+            logger.exception("Failed to add comment: %s", exc)
+            print("Failed to add comment.")
+
+    ans = input("Create test cases based on this validation? [y/N]: ").strip().lower()
+    if ans.startswith("y"):
+        cases = tester.create_test_cases(result)
+        print("\nGenerated test cases:\n", cases)
+
+
 def main() -> None:
     logger.info("Starting main interaction loop")
 
     logger.debug("Instantiating RouterAgent")
     router = RouterAgent()
+    tester = TestAgent()
     if langchain is not None:
         logger.info("LangChain available - advanced routing enabled")
 
@@ -59,6 +98,9 @@ def main() -> None:
             logger.info("Exiting interaction loop")
             break
 
+        if question.lower().startswith("validate"):
+            _interactive_validate(router, tester, question)
+            continue
         try:
             answer = router.ask(question)
             logger.info("Agent response: %s", answer)

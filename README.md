@@ -69,7 +69,7 @@ What is the status of SD-99?
 The `OpenAIService` class can be used to ask arbitrary questions via the OpenAI chat API:
 
 ```bash
-python openai_service.py "What is 2 + 2?"
+python src/services/openai_service.py "What is 2 + 2?"
 ```
 
 ### AI Agent with Jira Tools
