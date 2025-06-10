@@ -5,6 +5,7 @@ This repository contains a Jira AI assistant that communicates with the OpenAI A
 - Simple utilities for retrieving Jira issue details
 - OpenAI service integration for AI-powered assistance
 - A minimal agent that combines both capabilities
+- Automated test case generation for API issues
 
 ## Configuration
 
@@ -91,6 +92,15 @@ uvicorn app:app --reload
 ```
 
 The `/ask` endpoint accepts a JSON payload containing a `question` field and returns the answer from the `RouterAgent`.
+
+### Test Case Generation
+
+Ask the assistant for test cases and it will validate the Jira issue and return
+basic scenarios.
+
+```bash
+python main.py "Generate test cases for RB-1234"
+```
 
 ### Error Handling
 
