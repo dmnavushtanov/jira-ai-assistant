@@ -1,7 +1,7 @@
 app_name: VirtualLibrary
 environment: development
-debug: false
-rich_logging: true
+debug: true
+rich_logging: false
 base_llm: openai
 openai_model: gpt-3.5-turbo
 anthropic_model: claude-3-opus
@@ -16,4 +16,4 @@ max_questions_to_remember: 3
 strip_unused_jira_data: true
 follow_related_jiras: true
 validation_prompts_dir: validation
-write_comments_to_jira: false
+write_comments_to_jira: true
