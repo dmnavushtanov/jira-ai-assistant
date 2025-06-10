@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Dict, Optional
+
+import json
+import re
 
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
@@ -21,11 +24,36 @@ class TestAgent:
         logger.debug("Initializing TestAgent with config_path=%s", config_path)
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
-        self.prompt_template = load_prompt("tests/testCasesGeneration.txt")
+        self.prompts = {
+            "GET": load_prompt("tests/get_test_cases.txt"),
+            "POST": load_prompt("tests/post_test_cases.txt"),
+            "PUT": load_prompt("tests/put_test_cases.txt"),
+            "DELETE": load_prompt("tests/delete_test_cases.txt"),
+        }
+        self.default_prompt = load_prompt("tests/testCasesGeneration.txt")
 
-    def create_test_cases(self, validation_result: str, **kwargs: Any) -> str:
-        """Return test cases based on ``validation_result``."""
-        template = self.prompt_template or (
+    def _extract_method(self, validation_result: str) -> Optional[str]:
+        """Return HTTP method found in ``validation_result`` if any."""
+        try:
+            data: Dict[str, Any] = json.loads(validation_result)
+        except Exception:
+            from src.utils import parse_json_block
+
+            data = parse_json_block(validation_result) or {}
+        if isinstance(data, dict):
+            parsed = data.get("parsed") or {}
+            method = parsed.get("method")
+            if method:
+                return str(method).upper()
+        match = re.search(r"\b(GET|POST|PUT|DELETE)\b", validation_result, re.I)
+        return match.group(1).upper() if match else None
+
+    def create_test_cases(
+        self, validation_result: str, method: Optional[str] = None, **kwargs: Any
+    ) -> str:
+        """Return test cases based on ``validation_result`` and HTTP ``method``."""
+        method = (method or self._extract_method(validation_result) or "GET").upper()
+        template = self.prompts.get(method) or self.default_prompt or (
             "Generate test cases based on the following validation summary:\n{summary}"
         )
         prompt = safe_format(template, {"summary": validation_result})
