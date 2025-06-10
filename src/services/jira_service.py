@@ -155,9 +155,32 @@ def add_comment_to_issue_func(issue_id: str, comment: str) -> str:
     logger.info("Added comment to issue %s", issue_id)
     return json.dumps(result)
 
+
+def _add_comment_wrapper(*args: str) -> str:
+    """Wrapper allowing single or dual argument invocation."""
+    if len(args) == 1:
+        text = args[0]
+        try:
+            data = json.loads(text)
+            issue_id = data["issue_id"]
+            comment = data["comment"]
+        except Exception:
+            if "|" in text:
+                issue_id, comment = text.split("|", 1)
+            else:
+                raise TypeError(
+                    "add_comment_to_issue requires 'issue_id|comment' or JSON"
+                )
+    elif len(args) == 2:
+        issue_id, comment = args
+    else:
+        raise TypeError("add_comment_to_issue expects issue_id and comment")
+
+    return add_comment_to_issue_func(issue_id.strip(), comment.strip())
+
 add_comment_to_issue_tool = Tool(
     name="add_comment_to_issue",
-    func=add_comment_to_issue_func,
+    func=_add_comment_wrapper,
     description=(
         "Add a text comment to an existing Jira issue. "
         "Provide the issue key and comment. Returns the created comment JSON."
