@@ -1,3 +1,13 @@
+"""CLI entry point for the Jira AI assistant.
+
+This script starts a simple interaction loop using ``RouterAgent``. When a
+question requests API validation, the ``ApiValidatorAgent`` is invoked and the
+validation results are sent back through the router. The router may then
+delegate to ``JiraOperationsAgent`` to post a comment summarising the result.
+Comment posting can be disabled with ``write_comments_to_jira: false`` in
+``config.yml``.
+"""
+
 import os
 from dotenv import load_dotenv
 from src.jira_client import JiraClient
@@ -40,6 +50,8 @@ def main() -> None:
 
     logger.debug("Instantiating RouterAgent")
     router = RouterAgent()
+    if langchain is not None:
+        logger.info("LangChain available - advanced routing enabled")
 
     while True:
         question = input("Enter your question (type 'exit' to quit): ").strip()
