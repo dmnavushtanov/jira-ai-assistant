@@ -8,6 +8,11 @@ import re
 from typing import Any
 
 try:
+    from langchain.tools import Tool  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    Tool = None
+
+try:
     from langchain.memory import (
         ConversationBufferWindowMemory,
         ConversationSummaryMemory,
@@ -89,6 +94,28 @@ class RouterAgent:
         self.issue_re = re.compile(rf"(?:{pattern})-\d+", re.IGNORECASE)
         self.router_prompt = load_prompt("router.txt")
         self.history_prompt = load_prompt("needs_history.txt")
+        self.intent_prompt = load_prompt("intent_classifier.txt")
+
+        # expose helper agents for external orchestration
+        intent_tool = None
+        if Tool is not None:
+            intent_tool = Tool(
+                name="classify_intent",
+                func=self._classify_intent,
+                description=(
+                    "Classify user intent as VALIDATE, OPERATE, INSIGHT, or UNKNOWN"
+                ),
+            )
+
+        self.tools = {
+            "classifier": self.classifier,
+            "validator": self.validator,
+            "insights": self.insights,
+            "operations": self.operations,
+            "tester": self.tester,
+        }
+        if intent_tool:
+            self.tools["classify_intent"] = intent_tool
 
     # ------------------------------------------------------------------
     # Helpers
@@ -102,18 +129,27 @@ class RouterAgent:
         logger.warning("No issue id found in text: %s", text)
         return None
 
+    def _classify_intent(self, question: str, **kwargs: Any) -> str:
+        """Return the intent label for ``question`` using the classifier agent."""
+        if self.intent_prompt:
+            prompt = safe_format(self.intent_prompt, {"question": question})
+        else:
+            prompt = (
+                "You are a Jira assistant. Classify the user intent based on the question below.\n"
+                "Possible intents:\n- VALIDATE: Validate the API of a Jira issue\n"
+                "- OPERATE: Perform a Jira operation (add comment, close issue, assign, etc.)\n"
+                "- INSIGHT: Answer a question about the Jira issue\n"
+                "- UNKNOWN: Not sure what the intent is\n\nQuestion: {question}\n"
+                "Respond with one of: VALIDATE, OPERATE, INSIGHT, UNKNOWN"
+            ).format(question=question)
+        label = self.classifier.classify(prompt, **kwargs)
+        result = str(label).strip().upper()
+        logger.debug("Intent classification result: %s", result)
+        return result
+
     def _should_validate(self, question: str, **kwargs: Any) -> bool:
-        """Return ``True`` if ``question`` explicitly requests validation."""
-        lowered = question.lower()
-        patterns = [
-            r"\b(validate|test)\s+(this\s+)?(jira|issue)\b",
-            r"\b(validate|test)\s+[a-z][a-z0-9]+-\d+",
-        ]
-        for pattern in patterns:
-            if re.search(pattern, lowered):
-                logger.debug("Explicit validation phrase detected: %s", pattern)
-                return True
-        return False
+        """Return ``True`` if the detected intent is VALIDATE."""
+        return self._classify_intent(question, **kwargs).startswith("VALIDATE")
 
     def _needs_history(self, question: str, **kwargs: Any) -> bool:
         """Return True if the LLM determines the changelog is required."""
@@ -238,7 +274,8 @@ class RouterAgent:
             return answer
 
         try:
-            if self._should_validate(question, **kwargs):
+            intent = self._classify_intent(question, **kwargs)
+            if intent.startswith("VALIDATE"):
                 logger.info("Routing to validation workflow")
                 answer = self._classify_and_validate(issue_id, **kwargs)
                 comment_posted = self._handle_validation_result(issue_id, answer)
@@ -247,6 +284,9 @@ class RouterAgent:
                 tests = self._generate_test_cases(answer, **kwargs)
                 if tests:
                     answer += "\n\n" + tests
+            elif intent.startswith("OPERATE"):
+                logger.info("Routing to operations workflow")
+                answer = "Operation handling not implemented"
             else:
                 logger.info("Routing to general insights workflow")
                 include_history = self._needs_history(question, **kwargs)
