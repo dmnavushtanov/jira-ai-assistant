@@ -178,6 +178,28 @@ def update_issue_fields_func(issue_id: str, fields_json: str) -> str:
     logger.info("Updated issue %s", issue_id)
     return json.dumps(updated)
 
+
+def fill_field_by_label_func(issue_id: str, field_label: str, value: str) -> str:
+    """Update an issue field using its display label."""
+    logger.debug(
+        "Filling field %s on %s with value %s", field_label, issue_id, value
+    )
+    client = _get_jira_client()
+    updated = client.set_field_by_label(issue_id, field_label, value)
+    logger.info("Updated %s on %s", field_label, issue_id)
+    return json.dumps(updated)
+
+
+fill_field_by_label_tool = Tool(
+    name="fill_field_by_label",
+    func=fill_field_by_label_func,
+    description=(
+        "Set a field's value using the human readable label. Provide the issue key,"
+        " the field label such as 'Definition Of Done' and the new value."
+        " Returns the updated issue JSON."
+    ),
+)
+
 update_issue_fields_tool = Tool(
     name="update_issue_fields",
     func=update_issue_fields_func,
@@ -197,6 +219,7 @@ jira_tools = [
     get_issue_history_tool,
     get_related_issues_tool,
     add_comment_to_issue_tool,
+    fill_field_by_label_tool,
     update_issue_fields_tool,
 ]
 
@@ -207,6 +230,7 @@ __all__ = [
     "get_issue_history_tool",
     "get_related_issues_tool",
     "add_comment_to_issue_tool",
+    "fill_field_by_label_tool",
     "update_issue_fields_tool",
     "jira_tools",
 ]

@@ -9,6 +9,7 @@ from typing import Any
 from src.services.jira_service import (
     add_comment_to_issue_tool,
     create_jira_issue_tool,
+    fill_field_by_label_tool,
     update_issue_fields_tool,
 )
 from src.configs.config import load_config
@@ -61,6 +62,18 @@ class JiraOperationsAgent:
             return json.loads(result_json)
         except Exception:
             logger.debug("Failed to parse update_fields response")
+            return result_json
+
+    def fill_field_by_label(
+        self, issue_id: str, field_label: str, value: str, **kwargs: Any
+    ) -> str:
+        """Set an issue field value using the field's label."""
+        logger.info("Setting %s on %s", field_label, issue_id)
+        result_json = fill_field_by_label_tool.run(issue_id, field_label, value)
+        try:
+            return json.loads(result_json)
+        except Exception:
+            logger.debug("Failed to parse fill_field_by_label response")
             return result_json
 
 
