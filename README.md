@@ -35,7 +35,7 @@ The assistant also remembers the last Jira key you referenced. Follow-up questio
 
 Set `strip_unused_jira_data: true` in the config to remove avatar URLs and ID fields from Jira payloads for more concise outputs.
 Set `follow_related_jiras: true` to automatically fetch and summarize linked issues and subtasks when answering questions. Comments from those related tickets are also retrieved so important context isn't missed.
-Set `ask_for_confirmation: true` to require a confirmation prompt before posting comments back to Jira.
+Set `ask_for_confirmation: true` to require a confirmation prompt before any changes are made in Jira, including creating issues, updating fields and posting comments.
 
 ### Debug Logging
 
