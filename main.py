@@ -1,19 +1,14 @@
 """CLI entry point for the Jira AI assistant.
 
-This script starts a simple interaction loop using ``RouterAgent``. When a
-question requests API validation, the ``ApiValidatorAgent`` is invoked and the
-validation results are sent back through the router. The router may then
-delegate to ``JiraOperationsAgent`` to post a comment summarising the result.
-Comment posting can be disabled with ``write_comments_to_jira: false`` in
-``config.yml``.
+This script starts a simple interaction loop using ``RouterAgent``. The router
+decides whether to validate APIs, perform operations, or provide insights based
+on the user's question. Comment posting and test case generation are handled by
+the router according to ``config.yml`` options.
 """
 
-import os
 from dotenv import load_dotenv
-from src.jira_client import JiraClient
 
 from src.agents.router_agent import RouterAgent
-from src.agents.test_agent import TestAgent
 from src.configs import load_config, setup_logging
 import logging
 
@@ -31,70 +26,11 @@ load_dotenv(override=True)
 config = load_config()
 setup_logging(config)
 
-def get_jira_client():
-    """Return a JiraClient instance using environment variables from .env file."""
-    base_url = os.getenv("JIRA_BASE_URL")
-    email = os.getenv("JIRA_EMAIL")
-    token = os.getenv("JIRA_API_TOKEN")
-    
-    if not all([base_url, email, token]):
-        raise RuntimeError(
-            "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN must be set in .env file"
-        )
-    
-    logger.debug("Creating JiraClient for %s", base_url)
-    return JiraClient(base_url, email, token)
-
-
-def _interactive_validate(
-    router: RouterAgent, tester: TestAgent, question: str | None = None
-) -> None:
-    """Run a validation workflow with optional comment posting and tests."""
-
-    issue_id = router._extract_issue_id(question or "") if question else None
-    if not issue_id:
-        issue_id = input("Please enter the Jira issue key: ").strip()
-    if not issue_id:
-        print("No issue id provided, aborting.")
-        return
-
-    result = router._classify_and_validate(issue_id)
-    print("\nValidation result:\n", result)
-
-    ans = input(
-        "Would you like me to post this validation result as a comment on Jira? (y/N): "
-    ).strip().lower()
-    comment = result
-    if not ans.startswith("y"):
-        correction = input(
-            "No problem. If you'd prefer a different comment, type it now or just press Enter to skip: "
-        ).strip()
-        if correction:
-            comment = correction
-        else:
-            comment = ""
-    if comment:
-        try:
-            router.operations.add_comment(issue_id, comment)
-            print(f"Comment added to {issue_id}.")
-        except Exception as exc:  # pragma: no cover - interactive use
-            logger.exception("Failed to add comment: %s", exc)
-            print("Failed to add comment.")
-
-    ans = input(
-        "Would you like me to create test cases based on this validation result? (y/N): "
-    ).strip().lower()
-    if ans.startswith("y"):
-        cases = tester.create_test_cases(result)
-        print("\nGenerated test cases:\n", cases)
-
-
 def main() -> None:
     logger.info("Starting main interaction loop")
 
     logger.debug("Instantiating RouterAgent")
     router = RouterAgent()
-    tester = TestAgent()
     if langchain is not None:
         logger.info("LangChain available - advanced routing enabled")
 
@@ -104,9 +40,6 @@ def main() -> None:
             logger.info("Exiting interaction loop")
             break
 
-        if question.lower().startswith("validate"):
-            _interactive_validate(router, tester, question)
-            continue
         try:
             answer = router.ask(question)
             logger.info("Agent response: %s", answer)
