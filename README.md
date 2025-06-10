@@ -95,8 +95,9 @@ The `/ask` endpoint accepts a JSON payload containing a `question` field and ret
 
 ### Test Case Generation
 
-Ask the assistant for test cases and it will validate the Jira issue and return
-basic scenarios.
+Ask the assistant for test cases and it will validate the Jira issue before trying
+to generate them. If the ticket lacks enough details the assistant will reply
+"Not enough information to generate test cases." otherwise it returns basic scenarios.
 
 ```bash
 python main.py "Generate test cases for RB-1234"

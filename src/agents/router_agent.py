@@ -226,28 +226,30 @@ class RouterAgent:
                 )
         return False
 
-    def _generate_test_cases(self, result: str, **kwargs: Any) -> str | None:
-        """Return test cases string if validation ``result`` is sufficient."""
+    def _generate_test_cases(self, result: str, **kwargs: Any) -> str:
+        """Return test cases string generated from ``result``."""
         try:
             data = json.loads(result)
         except Exception:
             data = parse_json_block(result)
-        if not isinstance(data, dict):
-            return None
-        is_valid = data.get("is_valid")
+
         method = None
-        parsed = data.get("parsed")
-        if isinstance(parsed, dict):
-            method = parsed.get("method")
-        if is_valid and method:
+        if isinstance(data, dict):
+            parsed = data.get("parsed")
+            if isinstance(parsed, dict):
+                method = parsed.get("method")
+
+        try:
             return self.tester.create_test_cases(result, method, **kwargs)
-        return None
+        except Exception:
+            logger.exception("Failed to generate test cases")
+            return "Not enough information to generate test cases."
 
     def _validate_and_generate_tests(self, issue_id: str, **kwargs: Any) -> str:
         """Run validation and return generated test cases if possible."""
         validation = self._classify_and_validate(issue_id, **kwargs)
         tests = self._generate_test_cases(validation, **kwargs)
-        return tests or validation
+        return tests
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
