@@ -55,12 +55,10 @@ class ApiValidatorAgent:
 
         template = self.prompts.get(status)
         if not template:
-            logger.warning("No prompt found for status %s", status)
-            template = self.general_prompt
-            if not template:
-                return ""
-        elif self.general_prompt:
-            template = f"{self.general_prompt}\n{template}"
+            raise RuntimeError(f"No validation prompt for status {status}")
+        if not self.general_prompt:
+            raise RuntimeError("General validation prompt not found")
+        template = f"{self.general_prompt}\n{template}"
 
         values = {
             "key": issue.get("key", ""),

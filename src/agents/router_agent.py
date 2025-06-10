@@ -134,17 +134,9 @@ class RouterAgent:
 
     def _classify_intent(self, question: str, **kwargs: Any) -> str:
         """Return the intent label for ``question`` using the classifier agent."""
-        if self.intent_prompt:
-            prompt = safe_format(self.intent_prompt, {"question": question})
-        else:
-            prompt = (
-                "You are a Jira assistant. Classify the user intent based on the question below.\n"
-                "Possible intents:\n- VALIDATE: Validate the API of a Jira issue\n"
-                "- OPERATE: Perform a Jira operation (add comment, close issue, assign, etc.)\n"
-                "- INSIGHT: Answer a question about the Jira issue\n"
-                "- UNKNOWN: Not sure what the intent is\n\nQuestion: {question}\n"
-                "Respond with one of: VALIDATE, OPERATE, INSIGHT, UNKNOWN"
-            ).format(question=question)
+        if not self.intent_prompt:
+            raise RuntimeError("Intent classification prompt not found")
+        prompt = safe_format(self.intent_prompt, {"question": question})
         label = self.classifier.classify(prompt, **kwargs)
         result = str(label).strip().upper()
         logger.debug("Intent classification result: %s", result)
@@ -156,13 +148,9 @@ class RouterAgent:
 
     def _needs_history(self, question: str, **kwargs: Any) -> bool:
         """Return True if the LLM determines the changelog is required."""
-        if self.history_prompt:
-            prompt = safe_format(self.history_prompt, {"question": question})
-        else:
-            prompt = (
-                "Do we need the change history to answer this question? "
-                "Respond with HISTORY or NO_HISTORY.\nQuestion: " + question
-            )
+        if not self.history_prompt:
+            raise RuntimeError("History check prompt not found")
+        prompt = safe_format(self.history_prompt, {"question": question})
         label = self.classifier.classify(prompt, **kwargs)
         result = str(label).strip().upper().startswith("HISTORY")
         logger.debug("Needs history: %s (label=%s)", result, label)
