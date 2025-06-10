@@ -58,11 +58,18 @@ class JiraOperationsAgent:
         description: str,
         project_key: str,
         issue_type: str = "Task",
+        *,
+        parent_key: str | None = None,
         **kwargs: Any,
     ) -> str:
-        """Create a new Jira issue."""
+        """Create a new Jira issue.
+
+        ``parent_key`` is used when ``issue_type`` is ``Sub-task``.
+        """
         logger.info("Creating issue in %s", project_key)
-        result_json = create_jira_issue_tool.run(summary, description, project_key, issue_type)
+        result_json = create_jira_issue_tool.run(
+            summary, description, project_key, issue_type, parent_key
+        )
         try:
             return json.loads(result_json)
         except Exception:
