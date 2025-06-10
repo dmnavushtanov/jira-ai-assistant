@@ -1,0 +1,38 @@
+You are validating an issue currently marked as "Backlog".
+Required information we want to exist is :
+1. **Swagger URL**
+2. **HTTP Method**
+    - Exactly one of "POST", "GET", "PUT", or "DELETE" in uppercase.
+3. Some free text describing business logic of the api.Business logic should be meaningful not just some text. 
+  - Example: "Gets endpoint that provides a list of physical and legal entities who participate in some way in 
+    the system but are outside the main defined categories in people module 
+    (agents, clients, offices, employees, insurers, banks, experts, creditors and sales channels). 
+    The result contains details for their role according to the filter criteria provided in the query parameters."
+4. Parse the "Summary" and "Description." Ignore Jira-specific color tags or images unless they carry URLs or JSON blocks.
+{body_instructions}
+5. Return exactly one JSON object (no extra commentary) according to the schema below.
+
+**Output JSON Schema:**
+  ```json
+  {{
+  "jira_key": "string or null",
+  "is_valid": true | false,
+  "errors": ["list of missing, malformed, or inconsistent fields"],
+  "parsed": {{
+    "swagger_url": "string or null",
+    "method": "POST" | "GET" | "PUT" | "DELETE" | null,
+    "api_url": "string or null",
+      "request_body_exists": true | false,
+      "request_body_valid": true | false,
+      "response_body_exists": true | false,
+      "response_body_valid": true | false,
+      "request_body_example": {{ ... }} | null,
+      "response_example": {{ ... }} | null,
+  }},
+  "jira_comment": "Natural-language summary of missing or malformed fields with specific example suggestions, appropriate to the development status. If the request body exists but is invalid, mention it."
+  }}
+  ```
+
+Issue Key: {key}
+Summary: {summary}
+Description: {description}
