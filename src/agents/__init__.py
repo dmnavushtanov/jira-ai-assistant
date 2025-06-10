@@ -13,6 +13,7 @@ from .api_validator import ApiValidatorAgent
 from .issue_insights import IssueInsightsAgent
 from .jira_operations import JiraOperationsAgent
 from .router_agent import RouterAgent
+from .test_agent import TestAgent
 
 __all__ = [
     "ClassifierAgent",
@@ -20,5 +21,6 @@ __all__ = [
     "IssueInsightsAgent",
     "JiraOperationsAgent",
     "RouterAgent",
+    "TestAgent",
 ]
 
