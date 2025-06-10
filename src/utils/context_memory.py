@@ -2,7 +2,8 @@ from __future__ import annotations
 
 """Lightweight memory for tracking the current Jira issue in a conversation."""
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, Deque
+from collections import deque
 import re
 
 try:
@@ -14,9 +15,10 @@ except Exception:  # pragma: no cover - langchain optional
 class JiraContextMemory(BaseMemory):
     """Simple conversation memory keeping track of a Jira issue id."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_turns: int = 10) -> None:
+        self.max_turns = max_turns
         self.current_issue: Optional[str] = None
-        self.chat_history: List[str] = []
+        self.chat_history: Deque[str] = deque(maxlen=2 * max_turns)
 
     # ------------------------------------------------------------------
     # BaseMemory API
@@ -50,7 +52,7 @@ class JiraContextMemory(BaseMemory):
     def clear(self) -> None:
         """Reset memory state."""
         self.current_issue = None
-        self.chat_history = []
+        self.chat_history = deque(maxlen=2 * self.max_turns)
 
     # ------------------------------------------------------------------
     # Helpers

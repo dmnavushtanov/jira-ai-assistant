@@ -50,9 +50,16 @@ get_issue_by_id_tool = Tool(
 # --- Tool for creating a new Jira issue ---
 
 def create_jira_issue_func(
-    summary: str, description: str, project_key: str, issue_type: str = "Task"
+    summary: str,
+    description: str,
+    project_key: str,
+    issue_type: str = "Task",
+    parent_key: str | None = None,
 ) -> str:
-    """Create a new Jira issue."""
+    """Create a new Jira issue.
+
+    ``parent_key`` sets the parent when creating a sub-task.
+    """
     logger.debug(
         "Creating Jira issue in project %s with summary %s", project_key, summary
     )
@@ -63,6 +70,8 @@ def create_jira_issue_func(
         "description": description,
         "issuetype": {"name": issue_type},
     }
+    if parent_key:
+        fields["parent"] = {"key": parent_key}
     issue = client.create_issue(fields)
     logger.info(
         "Created issue %s in project %s",
@@ -77,7 +86,8 @@ create_jira_issue_tool = Tool(
     func=create_jira_issue_func,
     description=(
         "Create a new Jira issue using summary, description and project_key. "
-        "Optionally specify issue_type (default 'Task'). Returns the created issue JSON."
+        "Optionally specify issue_type (default 'Task') and parent_key when "
+        "creating a sub-task. Returns the created issue JSON."
     ),
 )
 

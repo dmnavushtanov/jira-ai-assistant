@@ -58,11 +58,18 @@ class JiraOperationsAgent:
         description: str,
         project_key: str,
         issue_type: str = "Task",
+        *,
+        parent_key: str | None = None,
         **kwargs: Any,
     ) -> str:
-        """Create a new Jira issue."""
+        """Create a new Jira issue.
+
+        ``parent_key`` is used when ``issue_type`` is ``Sub-task``.
+        """
         logger.info("Creating issue in %s", project_key)
-        result_json = create_jira_issue_tool.run(summary, description, project_key, issue_type)
+        result_json = create_jira_issue_tool.run(
+            summary, description, project_key, issue_type, parent_key
+        )
         try:
             return json.loads(result_json)
         except Exception:
@@ -96,11 +103,9 @@ class JiraOperationsAgent:
     # ------------------------------------------------------------------
     def _plan_operation(self, question: str, issue_id: str | None = None, **kwargs: Any) -> dict[str, Any]:
         """Return an action plan dict for ``question`` using the LLM."""
-        template = self.plan_prompt or (
-            "Convert the user request into a JSON action. Current issue: {issue_id}.\n"
-            "Supported actions: add_comment, create_issue, fill_field_by_label, update_fields.\n"
-            "Request: {question}"
-        )
+        if not self.plan_prompt:
+            raise RuntimeError("Jira operations prompt not found")
+        template = self.plan_prompt
         prompt = safe_format(template, {"question": question, "issue_id": issue_id or ""})
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)

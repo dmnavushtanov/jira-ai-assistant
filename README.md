@@ -103,6 +103,25 @@ to generate them. If the ticket lacks enough details the assistant will reply
 python main.py "Generate test cases for RB-1234"
 ```
 
+### Issue Creation
+
+`IssueCreatorAgent` plans Jira tickets from a free-form request. It extracts the
+summary, description and issue type (Task, Story, Bug or Sub-task). When
+creating a sub-task a parent key is required. If missing the agent will ask for
+it.
+
+```python
+from src.agents import IssueCreatorAgent
+creator = IssueCreatorAgent()
+result = creator.create_issue(
+    "Create a bug: API returns 500 when posting to /api/books", "RB"
+)
+print(result)
+```
+
+When used with the `RouterAgent` any request starting with "create" is
+classified with the `CREATE` intent and routed through this agent.
+
 ### Error Handling
 
 The assistant now catches common issues such as invalid Jira keys or failures

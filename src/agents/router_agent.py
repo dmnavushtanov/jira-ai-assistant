@@ -31,6 +31,7 @@ from src.agents.issue_insights import IssueInsightsAgent
 from src.agents.api_validator import ApiValidatorAgent
 from src.agents.jira_operations import JiraOperationsAgent
 from src.agents.test_agent import TestAgent
+from src.agents.issue_creator import IssueCreatorAgent
 from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
 from src.utils import safe_format, JiraContextMemory, parse_json_block
@@ -53,6 +54,7 @@ class RouterAgent:
         self.insights = IssueInsightsAgent(config_path)
         self.operations = JiraOperationsAgent(config_path)
         self.tester = TestAgent(config_path)
+        self.creator = IssueCreatorAgent(config_path)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
         if self.use_memory:
@@ -103,7 +105,7 @@ class RouterAgent:
                 name="classify_intent",
                 func=self._classify_intent,
                 description=(
-                    "Classify user intent as VALIDATE, OPERATE, INSIGHT, or UNKNOWN"
+                    "Classify user intent as VALIDATE, OPERATE, INSIGHT, TEST, CREATE, or UNKNOWN"
                 ),
             )
 
@@ -113,6 +115,7 @@ class RouterAgent:
             "insights": self.insights,
             "operations": self.operations,
             "tester": self.tester,
+            "creator": self.creator,
         }
         if intent_tool:
             self.tools["classify_intent"] = intent_tool
@@ -132,19 +135,22 @@ class RouterAgent:
         logger.warning("No issue id found in text: %s", text)
         return None
 
+    def _extract_project_key(self, text: str) -> str | None:
+        """Return the first configured project key found in ``text``."""
+        if self.config.projects:
+            for key in self.config.projects:
+                pattern = rf"\b{re.escape(key)}\b"
+                if re.search(pattern, text, re.IGNORECASE):
+                    logger.debug("Extracted project key %s from text", key)
+                    return key.upper()
+        logger.warning("No project key found in text: %s", text)
+        return None
+
     def _classify_intent(self, question: str, **kwargs: Any) -> str:
         """Return the intent label for ``question`` using the classifier agent."""
-        if self.intent_prompt:
-            prompt = safe_format(self.intent_prompt, {"question": question})
-        else:
-            prompt = (
-                "You are a Jira assistant. Classify the user intent based on the question below.\n"
-                "Possible intents:\n- VALIDATE: Validate the API of a Jira issue\n"
-                "- OPERATE: Perform a Jira operation (add comment, close issue, assign, etc.)\n"
-                "- INSIGHT: Answer a question about the Jira issue\n"
-                "- UNKNOWN: Not sure what the intent is\n\nQuestion: {question}\n"
-                "Respond with one of: VALIDATE, OPERATE, INSIGHT, UNKNOWN"
-            ).format(question=question)
+        if not self.intent_prompt:
+            raise RuntimeError("Intent classification prompt not found")
+        prompt = safe_format(self.intent_prompt, {"question": question})
         label = self.classifier.classify(prompt, **kwargs)
         result = str(label).strip().upper()
         logger.debug("Intent classification result: %s", result)
@@ -156,13 +162,9 @@ class RouterAgent:
 
     def _needs_history(self, question: str, **kwargs: Any) -> bool:
         """Return True if the LLM determines the changelog is required."""
-        if self.history_prompt:
-            prompt = safe_format(self.history_prompt, {"question": question})
-        else:
-            prompt = (
-                "Do we need the change history to answer this question? "
-                "Respond with HISTORY or NO_HISTORY.\nQuestion: " + question
-            )
+        if not self.history_prompt:
+            raise RuntimeError("History check prompt not found")
+        prompt = safe_format(self.history_prompt, {"question": question})
         label = self.classifier.classify(prompt, **kwargs)
         result = str(label).strip().upper().startswith("HISTORY")
         logger.debug("Needs history: %s (label=%s)", result, label)
@@ -283,6 +285,15 @@ class RouterAgent:
             if intent.startswith("OPERATE"):
                 logger.info("Routing to operations workflow")
                 answer = self.operations.operate(question, issue_id=issue_id, **kwargs)
+            elif intent.startswith("CREATE"):
+                logger.info("Routing to issue creation workflow")
+                project_key = self._extract_project_key(question)
+                if not project_key and self.config.projects:
+                    project_key = self.config.projects[0]
+                if not project_key:
+                    answer = "Please specify a Jira project key"
+                else:
+                    answer = self.creator.create_issue(question, project_key, **kwargs)
             else:
                 if not issue_id:
                     answer = "No Jira ticket found in question"

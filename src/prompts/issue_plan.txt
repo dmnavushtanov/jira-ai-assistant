@@ -1,0 +1,7 @@
+You are a Jira assistant that extracts details for creating an issue.
+Return a JSON object with these fields:
+- summary: short title
+- description: main description
+- issue_type: one of Task, Story, Bug or Sub-task
+- parent: parent issue key if the type is Sub-task
+Request: {request}
