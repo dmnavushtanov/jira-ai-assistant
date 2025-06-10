@@ -104,11 +104,11 @@ class RouterAgent:
     def _should_validate(self, question: str, **kwargs: Any) -> bool:
         """Return ``True`` if ``question`` explicitly requests validation."""
         lowered = question.lower()
-        explicit_phrases = [
-            r"\bvalidate\s+this\s+jira\b",
-            r"\btest\s+this\s+jira\b",
+        patterns = [
+            r"\b(validate|test)\s+(this\s+)?(jira|issue)\b",
+            r"\b(validate|test)\s+[a-z][a-z0-9]+-\d+",
         ]
-        for pattern in explicit_phrases:
+        for pattern in patterns:
             if re.search(pattern, lowered):
                 logger.debug("Explicit validation phrase detected: %s", pattern)
                 return True
