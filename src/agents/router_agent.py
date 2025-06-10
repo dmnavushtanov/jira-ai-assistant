@@ -169,6 +169,15 @@ class RouterAgent:
                     issue_id,
                 )
                 return False
+            if self.config.ask_for_confirmation:
+                ans = input(
+                    "Do you want me to add this comment to the jira ticket? [y/N]: "
+                ).strip().lower()
+                if not ans.startswith("y"):
+                    logger.info(
+                        "User declined to add comment to %s", issue_id
+                    )
+                    return False
             try:
                 self.operations.add_comment(issue_id, comment)
                 logger.info("Posted validation comment to %s", issue_id)
