@@ -242,6 +242,12 @@ class RouterAgent:
         if is_valid and method:
             return self.tester.create_test_cases(result, method, **kwargs)
         return None
+
+    def _validate_and_generate_tests(self, issue_id: str, **kwargs: Any) -> str:
+        """Run validation and return generated test cases if possible."""
+        validation = self._classify_and_validate(issue_id, **kwargs)
+        tests = self._generate_test_cases(validation, **kwargs)
+        return tests or validation
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -287,6 +293,9 @@ class RouterAgent:
                 tests = self._generate_test_cases(answer, **kwargs)
                 if tests:
                     answer += "\n\n" + tests
+            elif intent.startswith("TEST"):
+                logger.info("Routing to test generation workflow")
+                answer = self._validate_and_generate_tests(issue_id, **kwargs)
             elif intent.startswith("OPERATE"):
                 logger.info("Routing to operations workflow")
                 answer = "Operation handling not implemented"

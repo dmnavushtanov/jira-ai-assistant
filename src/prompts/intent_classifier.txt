@@ -4,8 +4,9 @@ Possible intents:
 - VALIDATE: Validate the API of a Jira issue
 - OPERATE: Perform a Jira operation (add comment, close issue, assign, etc.)
 - INSIGHT: Answer a question about the Jira issue
+- TEST: Generate test cases for the API of a Jira issue
 - UNKNOWN: Not sure what the intent is
 
 Question: {question}
 
-Respond with one of: VALIDATE, OPERATE, INSIGHT, UNKNOWN
+Respond with one of: VALIDATE, OPERATE, INSIGHT, TEST, UNKNOWN
