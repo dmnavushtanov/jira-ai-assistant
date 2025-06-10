@@ -25,6 +25,7 @@ from src.agents.classifier import ClassifierAgent
 from src.agents.issue_insights import IssueInsightsAgent
 from src.agents.api_validator import ApiValidatorAgent
 from src.agents.jira_operations import JiraOperationsAgent
+from src.agents.test_agent import TestAgent
 from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
 from src.utils import safe_format, JiraContextMemory, parse_json_block
@@ -46,6 +47,7 @@ class RouterAgent:
         self.validator = ApiValidatorAgent(config_path)
         self.insights = IssueInsightsAgent(config_path)
         self.operations = JiraOperationsAgent(config_path)
+        self.tester = TestAgent(config_path)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
         if self.use_memory:
@@ -187,6 +189,23 @@ class RouterAgent:
                     "Failed to add validation comment to %s", issue_id
                 )
         return False
+
+    def _generate_test_cases(self, result: str, **kwargs: Any) -> str | None:
+        """Return test cases string if validation ``result`` is sufficient."""
+        try:
+            data = json.loads(result)
+        except Exception:
+            data = parse_json_block(result)
+        if not isinstance(data, dict):
+            return None
+        is_valid = data.get("is_valid")
+        method = None
+        parsed = data.get("parsed")
+        if isinstance(parsed, dict):
+            method = parsed.get("method")
+        if is_valid and method:
+            return self.tester.create_test_cases(result, method, **kwargs)
+        return None
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -228,6 +247,9 @@ class RouterAgent:
                 comment_posted = self._handle_validation_result(issue_id, answer)
                 if comment_posted:
                     answer += "\n\nValidation summary posted as a Jira comment."
+                tests = self._generate_test_cases(answer, **kwargs)
+                if tests:
+                    answer += "\n\n" + tests
             else:
                 logger.info("Routing to general insights workflow")
                 include_history = self._needs_history(question, **kwargs)

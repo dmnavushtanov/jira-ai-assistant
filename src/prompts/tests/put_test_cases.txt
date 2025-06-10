@@ -1,0 +1,22 @@
+Generate three basic test cases for a PUT API endpoint. Each test case should include:
+1. A concise **name**.
+2. A short **description** of what it verifies.
+3. **Steps** to perform the check.
+4. The **expected result**.
+
+Make them generic enough for any PUT endpoint before implementation exists:
+- **Test Case 1: Success Path** — valid update returns 200 with updated resource.
+- **Test Case 2: Not Found** — updating a missing resource returns 404.
+- **Test Case 3: Other Error** — invalid body or server fault returns an appropriate error code (e.g. 400 or 500).
+
+Output a JSON array of objects following this example:
+```
+[
+  {
+    "name": "Success - Update Resource",
+    "description": "Valid PUT updates the resource.",
+    "steps": ["PUT /your/endpoint/1 with valid JSON", "Check HTTP status and response"],
+    "expected": {"status": 200, "body": {"id": 1, "...": "..."}}
+  }
+]
+```
