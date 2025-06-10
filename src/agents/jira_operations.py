@@ -28,7 +28,8 @@ class JiraOperationsAgent:
     def add_comment(self, issue_id: str, comment: str, **kwargs: Any) -> str:
         """Add ``comment`` to ``issue_id`` using the Jira API."""
         logger.info("Adding comment to %s", issue_id)
-        result_json = add_comment_to_issue_tool.run(issue_id, comment)
+        payload = json.dumps({"issue_id": issue_id, "comment": comment})
+        result_json = add_comment_to_issue_tool.run(payload)
         try:
             parsed = json.loads(result_json)
         except Exception:
