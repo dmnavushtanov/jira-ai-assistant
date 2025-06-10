@@ -88,9 +88,6 @@ class RouterAgent:
         self.router_prompt = load_prompt("router.txt")
         self.history_prompt = load_prompt("needs_history.txt")
 
-        self.moderation = None
-        self.injection_guard = None
-
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
