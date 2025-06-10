@@ -1,0 +1,22 @@
+Generate three basic test cases for a POST API endpoint. Each test case should include:
+1. A concise **name**.
+2. A short **description** of what it verifies.
+3. **Steps** to perform the check.
+4. The **expected result**.
+
+Make them generic enough for any POST endpoint before implementation exists:
+- **Test Case 1: Success Path** — valid body returns 201 with created resource.
+- **Test Case 2: Client Error** — missing or invalid fields returns 400 with an error message.
+- **Test Case 3: Other Error** — duplicate request or server fault returns an appropriate error code (e.g. 409 or 500).
+
+Output a JSON array of objects following this example:
+```
+[
+  {
+    "name": "Success - Create Resource",
+    "description": "Valid POST creates the resource.",
+    "steps": ["POST /your/endpoint with valid JSON", "Check HTTP status and response"],
+    "expected": {"status": 201, "body": {"id": "<generated>", "...": "..."}}
+  }
+]
+```
