@@ -1,4 +1,8 @@
-"""Agent for generating test cases and exercising APIs."""
+"""Agent for generating test cases and exercising APIs.
+
+This agent wraps its ``create_test_cases`` helper in a LangChain ``Tool`` so it
+can be composed with other agents.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +16,11 @@ from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
 from src.utils import safe_format
+
+try:
+    from langchain.tools import Tool  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    Tool = None
 
 logger = logging.getLogger(__name__)
 logger.debug("test_agent module loaded")
@@ -31,6 +40,17 @@ class TestAgent:
             "DELETE": load_prompt("tests/delete_test_cases.txt"),
         }
         self.default_prompt = load_prompt("tests/testCasesGeneration.txt")
+
+        # Tools exposed by this agent
+        self.tools = []
+        self.generate_tests_tool = None
+        if Tool is not None:
+            self.generate_tests_tool = Tool(
+                name="GenerateTests",
+                func=self.create_test_cases,
+                description="Generate test cases based on validation results.",
+            )
+            self.tools.append(self.generate_tests_tool)
 
     def _extract_method(self, validation_result: str) -> Optional[str]:
         """Return HTTP method found in ``validation_result`` if any."""
