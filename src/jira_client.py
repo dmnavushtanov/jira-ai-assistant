@@ -96,3 +96,26 @@ class JiraClient:
             except Exception:
                 logger.exception("Failed to fetch linked issue %s", getattr(other, "key", ""))
         return {"subtasks": subtasks, "linked_issues": linked}
+
+    def set_field_by_label(
+        self, issue_key: str, field_label: str, value: Any
+    ) -> Dict[str, Any]:
+        """Set a field's value using its display label.
+
+        ``field_label`` should match the human readable name shown in Jira's UI
+        (e.g. ``"Definition Of Done"``). The helper will look up the
+        corresponding field ID before performing the update.
+        """
+        logger.debug(
+            "Setting field labelled %s on %s to %s", field_label, issue_key, value
+        )
+        for field in self._jira.fields():
+            if field.get("name") == field_label:
+                field_id = field.get("id")
+                break
+        else:
+            raise ValueError(f"Field label '{field_label}' not found")
+
+        issue = self._jira.issue(issue_key)
+        issue.update(fields={field_id: value})
+        return JiraUtils.clean_issue(issue.raw, strip_unused=self._strip_unused)
