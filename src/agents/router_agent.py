@@ -24,6 +24,7 @@ from src.configs.config import load_config
 from src.agents.classifier import ClassifierAgent
 from src.agents.issue_insights import IssueInsightsAgent
 from src.agents.api_validator import ApiValidatorAgent
+from src.agents.jira_operations import JiraOperationsAgent
 from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
 from src.utils import safe_format, JiraContextMemory
@@ -44,6 +45,7 @@ class RouterAgent:
         self.classifier = ClassifierAgent(config_path)
         self.validator = ApiValidatorAgent(config_path)
         self.insights = IssueInsightsAgent(config_path)
+        self.operations = JiraOperationsAgent(config_path)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
         if self.use_memory:
@@ -146,6 +148,33 @@ class RouterAgent:
             return self.validator.validate(issue, **kwargs)
         return "Issue not API related"
 
+    def _handle_validation_result(self, issue_id: str, result: str) -> bool:
+        """Post validation results to Jira if a comment is present.
+
+        Returns ``True`` if a comment was successfully posted.
+        """
+        try:
+            data = json.loads(result)
+            comment = data.get("jira_comment")
+        except Exception:
+            logger.debug("Validation result not JSON")
+            comment = None
+        if comment:
+            if not self.config.write_comments_to_jira:
+                logger.info(
+                    "write_comments_to_jira disabled; skipping comment to %s",
+                    issue_id,
+                )
+                return False
+            try:
+                self.operations.add_comment(issue_id, comment)
+                logger.info("Posted validation comment to %s", issue_id)
+                return True
+            except Exception:
+                logger.exception(
+                    "Failed to add validation comment to %s", issue_id
+                )
+        return False
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -184,6 +213,9 @@ class RouterAgent:
             if self._should_validate(question, **kwargs):
                 logger.info("Routing to validation workflow")
                 answer = self._classify_and_validate(issue_id, **kwargs)
+                comment_posted = self._handle_validation_result(issue_id, answer)
+                if comment_posted:
+                    answer += "\n\nValidation summary posted as a Jira comment."
             else:
                 logger.info("Routing to general insights workflow")
                 include_history = self._needs_history(question, **kwargs)

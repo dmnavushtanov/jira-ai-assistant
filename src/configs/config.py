@@ -33,6 +33,7 @@ class Config:
     max_questions_to_remember: int
     strip_unused_jira_data: bool
     follow_related_jiras: bool
+    write_comments_to_jira: bool
     validation_prompts_dir: str = "validation"
 
 
@@ -110,5 +111,6 @@ def load_config(path: str = None) -> Config:
         max_questions_to_remember=_env_int("MAX_NUMBER_OF_QUESTIONS_TO_REMEMBER", data.get("max_questions_to_remember", 3)),
         strip_unused_jira_data=_env_bool("STRIP_UNUSED_JIRA_DATA", data.get("strip_unused_jira_data", False)),
         follow_related_jiras=_env_bool("FOLLOW_RELATED_JIRAS", data.get("follow_related_jiras", False)),
+        write_comments_to_jira=_env_bool("WRITE_COMMENTS_TO_JIRA", data.get("write_comments_to_jira", False)),
         validation_prompts_dir=os.getenv("VALIDATION_PROMPTS_DIR", data.get("validation_prompts_dir", "validation")),
     )

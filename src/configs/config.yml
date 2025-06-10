@@ -16,3 +16,4 @@ max_questions_to_remember: 3
 strip_unused_jira_data: true
 follow_related_jiras: true
 validation_prompts_dir: validation
+write_comments_to_jira: false
