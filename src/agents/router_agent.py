@@ -215,18 +215,14 @@ class RouterAgent:
                 if not confirm_action(
                     f"Should I post the suggested comment to {issue_id}?"
                 ):
-                    logger.info(
-                        "User declined to add comment to %s", issue_id
-                    )
+                    logger.info("User declined to add comment to %s", issue_id)
                     return False
             try:
                 self.operations.add_comment(issue_id, comment)
                 logger.info("Posted validation comment to %s", issue_id)
                 return True
             except Exception:
-                logger.exception(
-                    "Failed to add validation comment to %s", issue_id
-                )
+                logger.exception("Failed to add validation comment to %s", issue_id)
         return False
 
     def _generate_test_cases(self, result: str, **kwargs: Any) -> str:
@@ -248,18 +244,19 @@ class RouterAgent:
             logger.exception("Failed to generate test cases")
             return "Not enough information to generate test cases."
 
-    def _add_tests_to_acceptance(self, issue_id: str, tests: str) -> bool:
-        """Write ``tests`` to the Acceptance Criteria field of ``issue_id``."""
+    def _add_tests_to_description(self, issue_id: str, tests: str) -> bool:
+        """Append ``tests`` to the Description field of ``issue_id``."""
         try:
-            self.operations.fill_field_by_label(
-                issue_id, "Acceptance Criteria", tests
-            )
-            logger.info("Updated Acceptance Criteria for %s", issue_id)
+            issue_json = get_issue_by_id_tool.run(issue_id)
+            issue = json.loads(issue_json)
+            fields = issue.get("fields", {})
+            desc = fields.get("description", "") or ""
+            new_desc = desc + ("\n\n" if desc else "") + tests
+            self.operations.fill_field_by_label(issue_id, "Description", new_desc)
+            logger.info("Updated description for %s", issue_id)
             return True
         except Exception:
-            logger.exception(
-                "Failed to update Acceptance Criteria for %s", issue_id
-            )
+            logger.exception("Failed to update description for %s", issue_id)
             return False
 
     def _validate_and_generate_tests(self, issue_id: str, **kwargs: Any) -> str:
@@ -267,16 +264,16 @@ class RouterAgent:
         validation = self._classify_and_validate(issue_id, **kwargs)
         tests = self._generate_test_cases(validation, **kwargs)
         if tests and not tests.lower().startswith("not enough"):
-            if self._add_tests_to_acceptance(issue_id, tests):
-                tests += "\n\nAcceptance Criteria updated with generated tests."
+            if self._add_tests_to_description(issue_id, tests):
+                tests += "\n\nDescription updated with generated tests."
         return tests
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def ask(self, question: str, **kwargs: Any) -> str:
         """Route ``question`` to the appropriate workflow."""
         logger.info("Router received question: %s", question)
-
 
         if self.use_memory and self.memory is not None:
             user_count = sum(
@@ -317,7 +314,9 @@ class RouterAgent:
                     answer = "No Jira ticket found in question"
                     if self.use_memory and self.memory is not None:
                         self.memory.chat_memory.add_ai_message(answer)
-                    self.session_memory.save_context({"input": question}, {"output": answer})
+                    self.session_memory.save_context(
+                        {"input": question}, {"output": answer}
+                    )
                     return answer
                 if intent.startswith("VALIDATE"):
                     logger.info("Routing to validation workflow")
@@ -327,8 +326,10 @@ class RouterAgent:
                         answer += "\n\nValidation summary posted as a Jira comment."
                     tests = self._generate_test_cases(answer, **kwargs)
                     if tests:
-                        if not tests.lower().startswith("not enough") and self._add_tests_to_acceptance(issue_id, tests):
-                            answer += "\n\nAcceptance Criteria updated with generated tests."
+                        if not tests.lower().startswith(
+                            "not enough"
+                        ) and self._add_tests_to_description(issue_id, tests):
+                            answer += "\n\nDescription updated with generated tests."
                         answer += "\n\n" + tests
                 elif intent.startswith("TEST"):
                     logger.info("Routing to test generation workflow")
