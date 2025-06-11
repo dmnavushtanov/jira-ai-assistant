@@ -103,6 +103,7 @@ class TestAgent:
             )
             self.tools.append(self.generate_tests_tool)
 
+
     def _extract_method(self, text: str) -> Optional[str]:
         """Return HTTP method found in ``text`` if any."""
         try:
@@ -129,6 +130,7 @@ class TestAgent:
         ``None``. Otherwise the response contains the new tests which are
         returned as-is.
         """
+
         method = (method or self._extract_method(text) or "GET").upper()
         template = self.prompts.get(method) or self.default_prompt
         if not template:
