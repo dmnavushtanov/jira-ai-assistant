@@ -1,0 +1,3 @@
+Analyze the Jira content for the {method} endpoint and outline the key scenarios that should be tested.
+Jira Content:
+{jira_content}

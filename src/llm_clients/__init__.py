@@ -7,6 +7,7 @@ from typing import Optional
 from .openai_client import OpenAIClient
 from .claude_client import ClaudeClient
 from .base_llm_client import BaseLLMClient
+from .langchain_factory import create_langchain_llm
 from src.configs.config import load_config
 
 logger = logging.getLogger(__name__)
@@ -27,5 +28,10 @@ def create_llm_client(config_path: Optional[str] = None) -> BaseLLMClient:
     raise ValueError(f"Unsupported LLM provider: {config.base_llm}")
 
 
-__all__ = ["OpenAIClient", "ClaudeClient", "create_llm_client"]
+__all__ = [
+    "OpenAIClient",
+    "ClaudeClient",
+    "create_llm_client",
+    "create_langchain_llm",
+]
 

@@ -13,9 +13,18 @@ import json
 import re
 
 from src.configs.config import load_config
-from src.llm_clients import create_llm_client
+from src.llm_clients import create_llm_client, create_langchain_llm
 from src.prompts import load_prompt
 from src.utils import safe_format
+from src.agents.planning import create_planning_pipeline
+
+try:
+    from langchain.chains import LLMChain, SequentialChain  # type: ignore
+    from langchain.prompts import PromptTemplate  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    LLMChain = None  # type: ignore
+    SequentialChain = None  # type: ignore
+    PromptTemplate = None  # type: ignore
 
 try:
     from langchain.tools import Tool  # type: ignore
@@ -44,6 +53,42 @@ class TestAgent:
             "DELETE": load_prompt("tests/delete_test_cases.txt"),
         }
         self.default_prompt = load_prompt("tests/testCasesGeneration.txt")
+
+        # setup optional planning components using LangChain if available
+        self.llm = None
+        self.method_prompt = None
+        self.context_prompt = None
+        self.test_prompt = None
+        if PromptTemplate is not None:
+            # use a LangChain LLM that matches the configured provider
+            self.llm = create_langchain_llm(config_path)
+            if self.llm is not None:
+                method_instruction = load_prompt("tests/method_detection.txt")
+                context_instruction = load_prompt("tests/context_analysis.txt")
+
+                base_method = PromptTemplate(
+                    input_variables=["question", "instruction"],
+                    template="{instruction}\nQuestion: {question}\nMethod:",
+                )
+                self.method_prompt = base_method.partial(
+                    instruction=method_instruction
+                )
+
+                base_context = PromptTemplate(
+                    input_variables=["jira_content", "method", "instruction"],
+                    template="{instruction}\nMethod: {method}\n{jira_content}\nPlan:",
+                )
+                self.context_prompt = base_context.partial(
+                    instruction=context_instruction
+                )
+
+                base_test = PromptTemplate(
+                    input_variables=["summary", "method", "instruction"],
+                    template="{instruction}\nMethod: {method}\nSummary: {summary}",
+                )
+                self.test_prompt = base_test.partial(
+                    instruction=self.default_prompt
+                )
 
         # Tools exposed by this agent
         self.tools = []
@@ -94,6 +139,38 @@ class TestAgent:
                 result = str(response)
         logger.debug("Generated test cases: %s", result)
         return result
+
+    # ------------------------------------------------------------------
+    # Planning Pipeline
+    # ------------------------------------------------------------------
+    def create_planning_pipeline(self) -> Any:
+        """Create a multi-step planning pipeline."""
+        if None in (
+            self.llm,
+            LLMChain,
+            SequentialChain,
+            self.method_prompt,
+            self.context_prompt,
+            self.test_prompt,
+        ):
+            logger.warning("Planning pipeline not available")
+            return None
+        return create_planning_pipeline(
+            self.llm,
+            self.method_prompt,
+            self.context_prompt,
+            self.test_prompt,
+        )
+
+    def plan_and_generate(self, question: str, jira_content: str, **kwargs: Any) -> str:
+        """Plan test cases then generate them in a single pipeline."""
+        pipeline = self.create_planning_pipeline()
+        if pipeline is None:
+            return self.create_test_cases(
+                jira_content, method=self._extract_method(question)
+            )
+        result = pipeline({"question": question, "jira_content": jira_content})
+        return str(result.get("test_cases", ""))
 
 
 __all__ = ["TestAgent"]
