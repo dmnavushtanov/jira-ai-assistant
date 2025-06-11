@@ -10,11 +10,13 @@
   - **Test Case 1: Success Path** — valid body returns 201 with created resource.
   - **Test Case 2: Client Error** — missing or invalid fields returns 400 with an error message.
 
-  If the summary includes a POST URL (e.g. `POST: people/v1/experts`), use it in the `Endpoint URL` field. 
+  If the summary includes a POST URL (e.g. `POST: people/v1/experts`), use it in the `Endpoint URL` field.
   If the summary does not provide enough details to create meaningful tests, reply with:
   "Not enough information to generate test cases."
 
-  Output your answer as Markdown following exatly below example. Do not create multiple steps.Do not add '''json to the response. 
+Summary: {summary}
+
+  Output your answer as Markdown following exatly below example. Do not create multiple steps.Do not add '''json to the response.
   ```markdown
   **Test Case 1: Success - Create Resource**
 
