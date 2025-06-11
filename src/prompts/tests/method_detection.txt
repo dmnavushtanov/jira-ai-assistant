@@ -1,0 +1,1 @@
+Return only the HTTP method mentioned in the question (GET, POST, PUT or DELETE). If none is found, return GET.
