@@ -96,8 +96,11 @@ The `/ask` endpoint accepts a JSON payload containing a `question` field and ret
 ### Test Case Generation
 
 Ask the assistant for test cases and it will validate the Jira issue before trying
-to generate them. If the ticket lacks enough details the assistant will reply
-"Not enough information to generate test cases." otherwise it returns basic scenarios.
+to generate them. The planning pipeline first detects the HTTP method and then
+selects the matching prompt for generating tests. If the method cannot be
+identified, the default prompt is used. If the ticket lacks enough details the
+assistant will reply "Not enough information to generate test cases." otherwise
+it returns basic scenarios.
 
 When tests are successfully generated they are appended to the end of the issue's
 **Description** field using the Jira API.
