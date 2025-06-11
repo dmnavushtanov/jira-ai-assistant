@@ -1,4 +1,4 @@
-Generate three basic test cases for a POST API endpoint. Each test case should include:
+Generate two basic test cases for a POST API endpoint. Each test case should include:
 1. A concise **name**.
 2. A short **description** of what it verifies.
 3. **Steps** to perform the check.
@@ -7,19 +7,52 @@ Generate three basic test cases for a POST API endpoint. Each test case should i
 Make them generic enough for any POST endpoint before implementation exists:
 - **Test Case 1: Success Path** — valid body returns 201 with created resource.
 - **Test Case 2: Client Error** — missing or invalid fields returns 400 with an error message.
-- **Test Case 3: Other Error** — duplicate request or server fault returns an appropriate error code (e.g. 409 or 500).
 
 If the summary does not provide enough details to create meaningful tests, reply with:
 "Not enough information to generate test cases."
 
 Output a JSON array of objects following this example:
+```markdown
+### Test Case 1: Success - Create Resource
+
+**Description:**  
+Valid request should return 201 and the created resource.
+
+**Expected Result:**  
+Status: 201  
+Body:
+{
+  "id": "<generated-id>",
+  "message": "Resource created successfully"
+}
+
+**Actual Response:**  
+Status:  
+Body:
+
+**Developer Notes / Test Outcome:**  
+[...fill after testing...]
+
+---
+
+### Test Case 2: Client Error - Missing Field
+
+**Description:**  
+Missing a required field should return 400 with an error message.
+
+**Expected Result:**  
+Status: 400  
+Body:
+{
+  "error": "Missing required field"
+}
+
+**Actual Response:**  
+Status:  
+Body:
+
+**Developer Notes / Test Outcome:**  
+[...fill after testing...]
 ```
-[
-  {
-    "name": "Success - Create Resource",
-    "description": "Valid POST creates the resource.",
-    "steps": ["POST /your/endpoint with valid JSON", "Check HTTP status and response"],
-    "expected": {"status": 201, "body": {"id": "<generated>", "...": "..."}}
-  }
-]
-```
+
+
