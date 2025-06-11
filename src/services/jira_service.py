@@ -247,9 +247,37 @@ def fill_field_by_label_func(issue_id: str, field_label: str, value: str) -> str
     return json.dumps(updated)
 
 
+def _fill_field_by_label_wrapper(*args: str) -> str:
+    """Wrapper allowing single or triple argument invocation."""
+    if len(args) == 1:
+        text = args[0]
+        try:
+            data = json.loads(text)
+            issue_id = data["issue_id"]
+            field_label = data["field_label"]
+            value = data["value"]
+        except Exception:
+            if "|" in text:
+                issue_id, field_label, value = text.split("|", 2)
+            else:
+                raise TypeError(
+                    "fill_field_by_label requires 'issue_id|field_label|value' or JSON"
+                )
+    elif len(args) == 3:
+        issue_id, field_label, value = args
+    else:
+        raise TypeError(
+            "fill_field_by_label expects issue_id, field_label and value"
+        )
+
+    return fill_field_by_label_func(
+        issue_id.strip(), field_label.strip(), value.strip()
+    )
+
+
 fill_field_by_label_tool = Tool(
     name="fill_field_by_label",
-    func=fill_field_by_label_func,
+    func=_fill_field_by_label_wrapper,
     description=(
         "Set a field's value using the human readable label. Provide the issue key,"
         " the field label such as 'Definition Of Done' and the new value."
