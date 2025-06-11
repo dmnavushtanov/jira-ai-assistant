@@ -229,7 +229,10 @@ class RouterAgent:
         return False
 
     def _generate_test_cases(self, issue_id: str, question: str, **kwargs: Any) -> str:
-        """Return test cases string generated from Jira ``issue_id``."""
+        """Return test cases string generated from Jira ``issue_id``.
+
+        ``None`` is returned when test cases are already present on the issue.
+        """
         try:
             issue_json = get_issue_by_id_tool.run(issue_id)
             issue = json.loads(issue_json)
