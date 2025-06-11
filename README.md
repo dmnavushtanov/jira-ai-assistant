@@ -99,6 +99,9 @@ Ask the assistant for test cases and it will validate the Jira issue before tryi
 to generate them. If the ticket lacks enough details the assistant will reply
 "Not enough information to generate test cases." otherwise it returns basic scenarios.
 
+When tests are successfully generated they are appended to the end of the issue's
+**Description** field using the Jira API.
+
 ```bash
 python main.py "Generate test cases for RB-1234"
 ```
