@@ -2,9 +2,9 @@ You are validating a Jira issue to ensure it contains all required information b
 Required for Development:
 
 Swagger Specification URL - Link to API specification
-HTTP Method - One of: POST, GET, PUT, DELETE (uppercase)
+HTTP Method - One of: POST, GET, PUT, DELETE
 API Endpoint Path - The endpoint to implement
-Business Requirements - Clear description of what needs to be built (not just copy-paste text)
+Business Requirements - Clear description of what needs to be built (not just copy-paste text). 
 
 Validation Rules:
 
