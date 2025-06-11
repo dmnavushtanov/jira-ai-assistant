@@ -25,7 +25,9 @@ class JiraOperationsAgent:
     """Agent that performs modifications on Jira issues."""
 
     def __init__(self, config_path: str | None = None) -> None:
-        logger.debug("Initializing JiraOperationsAgent with config_path=%s", config_path)
+        logger.debug(
+            "Initializing JiraOperationsAgent with config_path=%s", config_path
+        )
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
 
@@ -91,7 +93,14 @@ class JiraOperationsAgent:
     ) -> str:
         """Set an issue field value using the field's label."""
         logger.info("Setting %s on %s", field_label, issue_id)
-        result_json = fill_field_by_label_tool.run(issue_id, field_label, value)
+        payload = json.dumps(
+            {
+                "issue_id": issue_id,
+                "field_label": field_label,
+                "value": value,
+            }
+        )
+        result_json = fill_field_by_label_tool.run(payload)
         try:
             return json.loads(result_json)
         except Exception:
@@ -101,12 +110,16 @@ class JiraOperationsAgent:
     # ------------------------------------------------------------------
     # Natural language operation handling
     # ------------------------------------------------------------------
-    def _plan_operation(self, question: str, issue_id: str | None = None, **kwargs: Any) -> dict[str, Any]:
+    def _plan_operation(
+        self, question: str, issue_id: str | None = None, **kwargs: Any
+    ) -> dict[str, Any]:
         """Return an action plan dict for ``question`` using the LLM."""
         if not self.plan_prompt:
             raise RuntimeError("Jira operations prompt not found")
         template = self.plan_prompt
-        prompt = safe_format(template, {"question": question, "issue_id": issue_id or ""})
+        prompt = safe_format(
+            template, {"question": question, "issue_id": issue_id or ""}
+        )
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         try:
@@ -164,7 +177,9 @@ class JiraOperationsAgent:
                 value = plan.get("value")
                 if not issue or not label:
                     return "Missing issue_id or field_label for fill_field_by_label"
-                result = self.fill_field_by_label(str(issue), str(label), str(value), **kwargs)
+                result = self.fill_field_by_label(
+                    str(issue), str(label), str(value), **kwargs
+                )
                 return json.dumps(result)
         except Exception:
             logger.exception("Failed to execute operation")
