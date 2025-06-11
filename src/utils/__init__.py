@@ -1,6 +1,12 @@
 """Utility helpers for the Jira AI Assistant."""
 
-from .jira import extract_plain_text, JiraUtils, strip_nulls, strip_unused_jira_data
+from .jira import (
+    extract_plain_text,
+    JiraUtils,
+    strip_nulls,
+    strip_unused_jira_data,
+    normalize_newlines,
+)
 from .prompt import safe_format
 from .rich_logger import RichLogger
 from .context_memory import JiraContextMemory
@@ -23,6 +29,7 @@ __all__ = [
     "strip_nulls",
     "strip_unused_jira_data",
     "JiraUtils",
+    "normalize_newlines",
     "safe_format",
     "RichLogger",
     "JiraContextMemory",
