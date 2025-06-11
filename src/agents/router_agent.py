@@ -229,7 +229,11 @@ class RouterAgent:
         return False
 
     def _generate_test_cases(self, issue_id: str, question: str, **kwargs: Any) -> str:
-        """Return test cases string generated from Jira ``issue_id``."""
+        """Return test cases string generated from Jira ``issue_id``.
+
+        The ``TestAgent`` will reply with ``HAS_TESTS`` if the description
+        already contains test cases. In that case an empty string is returned.
+        """
         try:
             issue_json = get_issue_by_id_tool.run(issue_id)
             issue = json.loads(issue_json)
@@ -237,7 +241,8 @@ class RouterAgent:
             summary = fields.get("summary", "") or ""
             description = fields.get("description", "") or ""
             text = f"{summary}\n{description}\n{question}"
-            return self.tester.create_test_cases(text, None, **kwargs)
+            tests = self.tester.create_test_cases(text, None, **kwargs)
+            return tests or ""
         except Exception:
             logger.exception("Failed to generate test cases")
             return "Not enough information to generate test cases."

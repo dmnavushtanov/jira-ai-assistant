@@ -119,8 +119,14 @@ class TestAgent:
 
     def create_test_cases(
         self, text: str, method: Optional[str] = None, **kwargs: Any
-    ) -> str:
-        """Return test cases based on ``text`` and HTTP ``method``."""
+    ) -> Optional[str]:
+        """Return generated test cases or ``None`` if tests already exist.
+
+        The LLM checks the provided ``text`` for existing test cases. If they
+        are present it responds with ``HAS_TESTS`` and this method returns
+        ``None``. Otherwise the response contains the new tests which are
+        returned as-is.
+        """
         method = (method or self._extract_method(text) or "GET").upper()
         template = self.prompts.get(method) or self.default_prompt
         if not template:
@@ -138,6 +144,8 @@ class TestAgent:
                 logger.exception("Failed to parse response")
                 result = str(response)
         logger.debug("Generated test cases: %s", result)
+        if result.upper().startswith("HAS_TESTS"):
+            return None
         return result
 
     # ------------------------------------------------------------------

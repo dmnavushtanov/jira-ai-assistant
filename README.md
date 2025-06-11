@@ -96,7 +96,8 @@ The `/ask` endpoint accepts a JSON payload containing a `question` field and ret
 ### Test Case Generation
 
 Ask the assistant for test cases and it will validate the Jira issue before trying
-to generate them. If the ticket lacks enough details the assistant will reply
+to generate them. The generation step first checks the description for existing
+tests. If any are found the assistant simply returns `HAS_TESTS`. If the ticket lacks enough details the assistant will reply
 "Not enough information to generate test cases." otherwise it returns basic scenarios.
 
 When tests are successfully generated they are appended to the end of the issue's
