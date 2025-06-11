@@ -1,4 +1,4 @@
-  Generate two basic test cases for a POST API endpoint. Each test case should include:
+  Generate two basic test cases for a POST API endpoint. First check if the provided description already contains test cases. If it does, reply only with `HAS_TESTS`. Otherwise create the new test cases. Each test case should include:
   1. A concise **name**.
   2. A short **description** of what it verifies.
   3. **Steps** to perform the check.

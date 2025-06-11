@@ -240,7 +240,8 @@ class RouterAgent:
             summary = fields.get("summary", "") or ""
             description = fields.get("description", "") or ""
             text = f"{summary}\n{description}\n{question}"
-            return self.tester.create_test_cases(text, None, **kwargs)
+            tests = self.tester.create_test_cases(text, None, **kwargs)
+            return tests or ""
         except Exception:
             logger.exception("Failed to generate test cases")
             return "Not enough information to generate test cases."
