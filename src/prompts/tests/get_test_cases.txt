@@ -1,4 +1,4 @@
-Generate three basic test cases for a GET API endpoint. Each test case should include:
+Generate two basic test cases for a GET API endpoint. Each test case should include:
 1. A concise **name**.
 2. A short **description** of what it verifies.
 3. **Steps** to perform the check.
@@ -7,19 +7,59 @@ Generate three basic test cases for a GET API endpoint. Each test case should in
 Make them generic enough to apply to any GET endpoint before any implementation exists:
 - **Test Case 1: Success Path** — valid request returns 200 and correct payload.
 - **Test Case 2: Client Error** — malformed or missing parameters returns 400 with an error message.
-- **Test Case 3: Other Error** — non-existent resource or server fault returns an appropriate error code (e.g. 404 or 500).
 
+If the summary includes a GET URL (e.g. `GET: people/v1/experts`), use it in the `Endpoint URL` field. 
 If the summary does not provide enough details to create meaningful tests, reply with:
 "Not enough information to generate test cases."
 
-Output your answer as a JSON array of objects, for example:
-```
-[
-  {
-    "name": "Success - Retrieve Resource",
-    "description": "Valid GET request returns the resource.",
-    "steps": ["Call GET /your/endpoint with a known ID", "Inspect HTTP status and body"],
-    "expected": {"status": 200, "body": {"id": "<same ID>", "...": "..."}}
-  }
-]
+  Output your answer as Markdown following exatly below example. Do not create multiple steps.Do not add '''json to the response. 
+Markdown array of objects, for example:
+```markdown
+**Test Case 1: Success - Retrieve Resource**
+
+**Description:**  
+Valid request should return 200 and the requested resource.
+
+**Endpoint URL:**  
+`<INSERT ENDPOINT HERE>`
+
+**Request Query Parameters:**
+// TODO: Add parameters once known
+?resourceId=<known-id>
+
+**Response:**  
+Status: 200  
+Body:
+{
+  "id": "<known-id>",
+  "name": "...",
+  "data": "..."
+}
+
+**Developer Notes / Test Outcome:**  
+[...fill after testing...]
+
+----------------------------------------------------
+
+**Test Case 2: Client Error - Invalid Parameter**
+
+**Description:**  
+Missing or malformed parameters should return 400 with an error message.
+
+**Endpoint URL:**  
+`<INSERT ENDPOINT HERE>`
+
+**Request Query Parameters:**
+// TODO: Add malformed input
+?resourceId=
+
+**Response:**  
+Status: 400  
+Body:
+{
+  "error": "Missing or invalid resourceId"
+}
+
+**Developer Notes / Test Outcome:**  
+[...fill after testing...]
 ```

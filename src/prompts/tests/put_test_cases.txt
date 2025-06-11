@@ -1,4 +1,4 @@
-Generate three basic test cases for a PUT API endpoint. Each test case should include:
+Generate two basic test cases for a PUT API endpoint. Each test case should include:
 1. A concise **name**.
 2. A short **description** of what it verifies.
 3. **Steps** to perform the check.
@@ -7,19 +7,55 @@ Generate three basic test cases for a PUT API endpoint. Each test case should in
 Make them generic enough for any PUT endpoint before implementation exists:
 - **Test Case 1: Success Path** — valid update returns 200 with updated resource.
 - **Test Case 2: Not Found** — updating a missing resource returns 404.
-- **Test Case 3: Other Error** — invalid body or server fault returns an appropriate error code (e.g. 400 or 500).
 
+If the summary includes a PUT URL (e.g. `PUT: people/v1/experts`), use it in the `Endpoint URL` field. 
 If the summary does not provide enough details to create meaningful tests, reply with:
 "Not enough information to generate test cases."
 
-Output a JSON array of objects following this example:
-```
-[
-  {
-    "name": "Success - Update Resource",
-    "description": "Valid PUT updates the resource.",
-    "steps": ["PUT /your/endpoint/1 with valid JSON", "Check HTTP status and response"],
-    "expected": {"status": 200, "body": {"id": 1, "...": "..."}}
-  }
-]
+  Output your answer as Markdown following exatly below example. Do not create multiple steps.Do not add '''json to the response. 
+```markdown
+**Test Case 1: Success - Update Resource**
+
+**Description:**  
+A valid PUT request should update the existing resource and return a 200 status with the updated content.
+
+**Endpoint URL:**  
+`<INSERT ENDPOINT HERE>`
+
+**Request:**  
+PUT /your/endpoint/<known-id>  
+Body:
+{
+  "name": "Updated Name",
+  "status": "active"
+}
+
+**Response:**  
+Status: 200  
+Body:
+{
+  "id": "<known-id>",
+  "name": "Updated Name",
+  "status": "active"
+}
+
+**Developer Notes / Test Outcome:**  
+[...fill after testing...]
+
+----------------------------------------------------
+
+**Test Case 2: Not Found - Update Missing Resource**
+
+**Description:**  
+A PUT request to update a resource that does not exist should return a 404 error.
+
+**Endpoint URL:**  
+`<INSERT ENDPOINT HERE>`
+
+**Request:**  
+PUT /your/endpoint/<nonexistent-id>  
+Body:
+{
+  "name": "Any Name",
+}
 ```
