@@ -6,13 +6,15 @@ from langchain.tools import Tool
 
 from src.jira_client import JiraClient
 from src.configs.config import load_config
+
+_CLIENT: JiraClient | None = None
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 def _get_jira_client() -> JiraClient:
-    """Instantiate a :class:`JiraClient` using environment variables."""
+    """Return a ``JiraClient`` using environment variables."""
     cfg = load_config()
     base_url = os.getenv("JIRA_BASE_URL")
     email = os.getenv("JIRA_EMAIL")
@@ -21,9 +23,28 @@ def _get_jira_client() -> JiraClient:
         raise ValueError(
             "JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN environment variables must be set"
         )
+
+    global _CLIENT
+    if cfg.reuse_jira_client:
+        if _CLIENT is None:
+            logger.debug("Creating JiraClient for base_url=%s email=%s", base_url, email)
+            _CLIENT = JiraClient(
+                base_url,
+                email,
+                token,
+                strip_unused_payload=cfg.strip_unused_jira_data,
+            )
+            logger.info("JiraClient initialized for %s", base_url)
+        return _CLIENT
+
     logger.debug("Creating JiraClient for base_url=%s email=%s", base_url, email)
     logger.info("JiraClient initialized for %s", base_url)
-    return JiraClient(base_url, email, token, strip_unused_payload=cfg.strip_unused_jira_data)
+    return JiraClient(
+        base_url,
+        email,
+        token,
+        strip_unused_payload=cfg.strip_unused_jira_data,
+    )
 
 
 # --- Tool for getting issue details by ID ---
