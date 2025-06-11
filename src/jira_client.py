@@ -109,11 +109,21 @@ class JiraClient:
         logger.debug(
             "Setting field labelled %s on %s to %s", field_label, issue_key, value
         )
+        field_id = None
+        built_in_match = None
         for field in self._jira.fields():
-            if field.get("name") == field_label:
-                field_id = field.get("id")
+            if field.get("name") != field_label:
+                continue
+            fid = field.get("id")
+            # Prefer standard fields over custom ones when names collide
+            if not fid.startswith("customfield_"):
+                built_in_match = fid
                 break
-        else:
+            if field_id is None:
+                field_id = fid
+
+        field_id = built_in_match or field_id
+        if not field_id:
             raise ValueError(f"Field label '{field_label}' not found")
 
         issue = self._jira.issue(issue_key)
