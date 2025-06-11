@@ -231,8 +231,7 @@ class RouterAgent:
     def _generate_test_cases(self, issue_id: str, question: str, **kwargs: Any) -> str:
         """Return test cases string generated from Jira ``issue_id``.
 
-        The ``TestAgent`` will reply with ``HAS_TESTS`` if the description
-        already contains test cases. In that case an empty string is returned.
+        ``None`` is returned when test cases are already present on the issue.
         """
         try:
             issue_json = get_issue_by_id_tool.run(issue_id)
