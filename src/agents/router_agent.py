@@ -228,21 +228,16 @@ class RouterAgent:
                 logger.exception("Failed to add validation comment to %s", issue_id)
         return False
 
-    def _generate_test_cases(self, result: str, **kwargs: Any) -> str:
-        """Return test cases string generated from ``result``."""
+    def _generate_test_cases(self, issue_id: str, question: str, **kwargs: Any) -> str:
+        """Return test cases string generated from Jira ``issue_id``."""
         try:
-            data = json.loads(result)
-        except Exception:
-            data = parse_json_block(result)
-
-        method = None
-        if isinstance(data, dict):
-            parsed = data.get("parsed")
-            if isinstance(parsed, dict):
-                method = parsed.get("method")
-
-        try:
-            return self.tester.create_test_cases(result, method, **kwargs)
+            issue_json = get_issue_by_id_tool.run(issue_id)
+            issue = json.loads(issue_json)
+            fields = issue.get("fields", {})
+            summary = fields.get("summary", "") or ""
+            description = fields.get("description", "") or ""
+            text = f"{summary}\n{description}\n{question}"
+            return self.tester.create_test_cases(text, None, **kwargs)
         except Exception:
             logger.exception("Failed to generate test cases")
             return "Not enough information to generate test cases."
@@ -263,10 +258,10 @@ class RouterAgent:
             logger.exception("Failed to update description for %s", issue_id)
             return False
 
-    def _validate_and_generate_tests(self, issue_id: str, **kwargs: Any) -> str:
+    def _validate_and_generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
         """Run validation and return generated test cases if possible."""
-        validation = self._classify_and_validate(issue_id, **kwargs)
-        tests = self._generate_test_cases(validation, **kwargs)
+        self._classify_and_validate(issue_id, **kwargs)
+        tests = self._generate_test_cases(issue_id, question, **kwargs)
         cleaned = normalize_newlines(tests)
         if cleaned and not cleaned.lower().startswith("not enough"):
             if self._add_tests_to_description(issue_id, cleaned):
@@ -329,7 +324,7 @@ class RouterAgent:
                     comment_posted = self._handle_validation_result(issue_id, answer)
                     if comment_posted:
                         answer += "\n\nValidation summary posted as a Jira comment."
-                    tests = self._generate_test_cases(answer, **kwargs)
+                    tests = self._generate_test_cases(issue_id, question, **kwargs)
                     if tests:
                         cleaned = normalize_newlines(tests)
                         if not cleaned.lower().startswith("not enough") and self._add_tests_to_description(issue_id, cleaned):
@@ -337,7 +332,7 @@ class RouterAgent:
                         answer += "\n\n" + cleaned
                 elif intent.startswith("TEST"):
                     logger.info("Routing to test generation workflow")
-                    answer = self._validate_and_generate_tests(issue_id, **kwargs)
+                    answer = self._validate_and_generate_tests(issue_id, question, **kwargs)
                 else:
                     logger.info("Routing to general insights workflow")
                     include_history = self._needs_history(question, **kwargs)

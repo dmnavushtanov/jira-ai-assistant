@@ -27,7 +27,11 @@ logger.debug("test_agent module loaded")
 
 
 class TestAgent:
-    """Agent that generates test cases from validation results."""
+    """Agent that generates test cases from freeform text.
+
+    The text can be a validation summary, the Jira issue description or any
+    other contextual information combined with the user's question.
+    """
 
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing TestAgent with config_path=%s", config_path)
@@ -52,32 +56,32 @@ class TestAgent:
             )
             self.tools.append(self.generate_tests_tool)
 
-    def _extract_method(self, validation_result: str) -> Optional[str]:
-        """Return HTTP method found in ``validation_result`` if any."""
+    def _extract_method(self, text: str) -> Optional[str]:
+        """Return HTTP method found in ``text`` if any."""
         try:
-            data: Dict[str, Any] = json.loads(validation_result)
+            data: Dict[str, Any] = json.loads(text)
         except Exception:
             from src.utils import parse_json_block
 
-            data = parse_json_block(validation_result) or {}
+            data = parse_json_block(text) or {}
         if isinstance(data, dict):
             parsed = data.get("parsed") or {}
             method = parsed.get("method")
             if method:
                 return str(method).upper()
-        match = re.search(r"\b(GET|POST|PUT|DELETE)\b", validation_result, re.I)
+        match = re.search(r"\b(GET|POST|PUT|DELETE)\b", text, re.I)
         return match.group(1).upper() if match else None
 
     def create_test_cases(
-        self, validation_result: str, method: Optional[str] = None, **kwargs: Any
+        self, text: str, method: Optional[str] = None, **kwargs: Any
     ) -> str:
-        """Return test cases based on ``validation_result`` and HTTP ``method``."""
-        method = (method or self._extract_method(validation_result) or "GET").upper()
+        """Return test cases based on ``text`` and HTTP ``method``."""
+        method = (method or self._extract_method(text) or "GET").upper()
         template = self.prompts.get(method) or self.default_prompt
         if not template:
             raise RuntimeError("Test case generation prompt not found")
-        prompt = safe_format(template, {"summary": validation_result})
-        logger.info("Generating test cases from validation result")
+        prompt = safe_format(template, {"summary": text})
+        logger.info("Generating test cases from provided text")
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         try:
