@@ -262,9 +262,8 @@ class RouterAgent:
             logger.exception("Failed to update description for %s", issue_id)
             return False
 
-    def _validate_and_generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
-        """Run validation and return generated test cases if possible."""
-        self._classify_and_validate(issue_id, **kwargs)
+    def _generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
+        """Return generated test cases and update Jira when possible."""
         tests = self._generate_test_cases(issue_id, question, **kwargs)
         cleaned = normalize_newlines(tests)
         if cleaned and not cleaned.lower().startswith("not enough"):
@@ -328,15 +327,9 @@ class RouterAgent:
                     comment_posted = self._handle_validation_result(issue_id, answer)
                     if comment_posted:
                         answer += "\n\nValidation summary posted as a Jira comment."
-                    tests = self._generate_test_cases(issue_id, question, **kwargs)
-                    if tests:
-                        cleaned = normalize_newlines(tests)
-                        if not cleaned.lower().startswith("not enough") and self._add_tests_to_description(issue_id, cleaned):
-                            answer += "\n\nDescription updated with generated tests."
-                        answer += "\n\n" + cleaned
                 elif intent.startswith("TEST"):
                     logger.info("Routing to test generation workflow")
-                    answer = self._validate_and_generate_tests(issue_id, question, **kwargs)
+                    answer = self._generate_tests(issue_id, question, **kwargs)
                 else:
                     logger.info("Routing to general insights workflow")
                     include_history = self._needs_history(question, **kwargs)
