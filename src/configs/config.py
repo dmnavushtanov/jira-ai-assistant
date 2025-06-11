@@ -55,6 +55,9 @@ def setup_logging(config: "Config") -> None:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
     logger.debug("Logging initialized at level %s", logging.getLevelName(level))
+    # Suppress noisy debug output from third-party HTTP clients
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
         import langchain
 
