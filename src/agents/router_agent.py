@@ -242,6 +242,11 @@ class RouterAgent:
             text = f"{summary}\n{description}\n{question}"
             tests = self.tester.create_test_cases(text, None, **kwargs)
             return tests or ""
+        except JIRAError:
+            logger.exception("Jira error while fetching issue %s", issue_id)
+            return (
+                f"Jira issue {issue_id} does not exist or you do not have permission to access it."
+            )
         except Exception:
             logger.exception("Failed to generate test cases")
             return "Not enough information to generate test cases."
