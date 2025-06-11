@@ -34,7 +34,12 @@ from src.agents.test_agent import TestAgent
 from src.agents.issue_creator import IssueCreatorAgent
 from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
-from src.utils import safe_format, JiraContextMemory, parse_json_block
+from src.utils import (
+    safe_format,
+    JiraContextMemory,
+    parse_json_block,
+    normalize_newlines,
+)
 
 from jira import JIRAError
 from openai import OpenAIError
@@ -200,6 +205,7 @@ class RouterAgent:
         else:
             comment = data.get("jira_comment") if isinstance(data, dict) else None
         if comment:
+            comment = normalize_newlines(comment)
             if not self.config.write_comments_to_jira:
                 logger.info(
                     "write_comments_to_jira disabled; skipping comment to %s",
@@ -244,6 +250,7 @@ class RouterAgent:
     def _add_tests_to_description(self, issue_id: str, tests: str) -> bool:
         """Append ``tests`` to the Description field of ``issue_id``."""
         try:
+            tests = normalize_newlines(tests)
             issue_json = get_issue_by_id_tool.run(issue_id)
             issue = json.loads(issue_json)
             fields = issue.get("fields", {})
@@ -260,10 +267,11 @@ class RouterAgent:
         """Run validation and return generated test cases if possible."""
         validation = self._classify_and_validate(issue_id, **kwargs)
         tests = self._generate_test_cases(validation, **kwargs)
-        if tests and not tests.lower().startswith("not enough"):
-            if self._add_tests_to_description(issue_id, tests):
-                tests += "\n\nDescription updated with generated tests."
-        return tests
+        cleaned = normalize_newlines(tests)
+        if cleaned and not cleaned.lower().startswith("not enough"):
+            if self._add_tests_to_description(issue_id, cleaned):
+                cleaned += "\n\nDescription updated with generated tests."
+        return cleaned
 
     # ------------------------------------------------------------------
     # Public API
@@ -323,11 +331,10 @@ class RouterAgent:
                         answer += "\n\nValidation summary posted as a Jira comment."
                     tests = self._generate_test_cases(answer, **kwargs)
                     if tests:
-                        if not tests.lower().startswith(
-                            "not enough"
-                        ) and self._add_tests_to_description(issue_id, tests):
+                        cleaned = normalize_newlines(tests)
+                        if not cleaned.lower().startswith("not enough") and self._add_tests_to_description(issue_id, cleaned):
                             answer += "\n\nDescription updated with generated tests."
-                        answer += "\n\n" + tests
+                        answer += "\n\n" + cleaned
                 elif intent.startswith("TEST"):
                     logger.info("Routing to test generation workflow")
                     answer = self._validate_and_generate_tests(issue_id, **kwargs)

@@ -5,6 +5,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def normalize_newlines(text: str | None) -> str | None:
+    """Return ``text`` with literal ``\\n`` sequences replaced."""
+    if isinstance(text, str):
+        return text.replace("\\n", "\n")
+    return text
+
+
 def extract_plain_text(content: Any) -> str:
     """Return plain text from Jira fields that may use Atlassian Document Format."""
     if isinstance(content, str):
@@ -112,6 +119,7 @@ class JiraUtils:
 
 
 __all__ = [
+    "normalize_newlines",
     "extract_plain_text",
     "strip_nulls",
     "strip_unused_jira_data",
