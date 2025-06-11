@@ -1,1 +1,1 @@
-Return only the HTTP method mentioned in the question (GET, POST, PUT or DELETE). If none is found, return GET.
+Return only the HTTP method mentioned in the question (GET, POST, PUT or DELETE). If none is found, No information found for method.
