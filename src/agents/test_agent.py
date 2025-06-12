@@ -31,6 +31,12 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     Tool = None
 
+try:
+    from langchain.agents import initialize_agent, AgentType  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    initialize_agent = None  # type: ignore
+    AgentType = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 logger.debug("test_agent module loaded")
 
@@ -95,6 +101,8 @@ class TestAgent:
         # Tools exposed by this agent
         self.tools = []
         self.generate_tests_tool = None
+        self.plan_tests_tool = None
+        self.react_agent = None
         if Tool is not None:
             self.generate_tests_tool = Tool(
                 name="GenerateTests",
@@ -102,6 +110,19 @@ class TestAgent:
                 description="Generate test cases based on validation results.",
             )
             self.tools.append(self.generate_tests_tool)
+            if self.llm is not None and initialize_agent is not None and AgentType is not None:
+                self.plan_tests_tool = Tool(
+                    name="PlanAndGenerateTests",
+                    func=self.plan_and_generate,
+                    description="Plan and generate test cases from question and Jira content.",
+                )
+                self.tools.append(self.plan_tests_tool)
+                self.react_agent = initialize_agent(
+                    tools=self.tools,
+                    llm=self.llm,
+                    agent=AgentType.REACT_DESCRIPTION,
+                    verbose=True,
+                )
 
 
     def _extract_method(self, text: str) -> Optional[str]:
@@ -130,6 +151,17 @@ class TestAgent:
         ``None``. Otherwise the response contains the new tests which are
         returned as-is.
         """
+
+        if None not in (
+            self.llm,
+            LLMChain,
+            self.method_prompt,
+            self.context_prompt,
+            self._base_test_prompt,
+        ):
+            logger.info("Running planning pipeline for test generation")
+            result = self.plan_and_generate(text, text, **kwargs)
+            return result if result and not result.upper().startswith("HAS_TESTS") else None
 
         method = (method or self._extract_method(text) or "GET").upper()
         template = self.prompts.get(method) or self.default_prompt
