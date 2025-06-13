@@ -154,10 +154,11 @@ class TestAgent:
 
         if None not in (
             self.llm,
-            LLMChain,
             self.method_prompt,
             self.context_prompt,
             self._base_test_prompt,
+            LLMChain,
+            SequentialChain,
         ):
             logger.info("Running planning pipeline for test generation")
             result = self.plan_and_generate(text, text, **kwargs)
@@ -191,11 +192,11 @@ class TestAgent:
         """Create a multi-step planning pipeline."""
         if None in (
             self.llm,
-            LLMChain,
-            SequentialChain,
             self.method_prompt,
             self.context_prompt,
             self.test_prompt,
+            LLMChain,
+            SequentialChain,
         ):
             logger.warning("Planning pipeline not available")
             return None
@@ -215,37 +216,31 @@ class TestAgent:
         """
         if None in (
             self.llm,
-            LLMChain,
             self.method_prompt,
             self.context_prompt,
             self._base_test_prompt,
+            LLMChain,
+            SequentialChain,
         ):
             return self.create_test_cases(
                 jira_content, method=self._extract_method(question)
             )
 
         # Step 1: detect the HTTP method
-        method_chain = LLMChain(
-            llm=self.llm, prompt=self.method_prompt, output_key="method"
-        )
-        method_result = method_chain({"question": question})
-        method = self._extract_method(str(method_result.get("method", ""))) or "GET"
+        method_chain = LLMChain(llm=self.llm, prompt=self.method_prompt)
+        method_result = method_chain.run(question=question)
+        method = self._extract_method(str(method_result)) or "GET"
 
         # Step 2: analyze the context
-        context_chain = LLMChain(
-            llm=self.llm, prompt=self.context_prompt, output_key="summary"
-        )
-        context_result = context_chain({"jira_content": jira_content, "method": method})
-        summary = context_result.get("summary", "")
+        context_chain = LLMChain(llm=self.llm, prompt=self.context_prompt)
+        summary = context_chain.run(jira_content=jira_content, method=method)
 
         # Step 3: select the appropriate generation prompt
         instruction = self.prompts.get(method) or self.default_prompt
         test_prompt = self._base_test_prompt.partial(instruction=instruction)
-        test_chain = LLMChain(
-            llm=self.llm, prompt=test_prompt, output_key="test_cases"
-        )
-        result = test_chain({"summary": summary, "method": method})
-        return str(result.get("test_cases", ""))
+        test_chain = LLMChain(llm=self.llm, prompt=test_prompt)
+        result = test_chain.run(summary=summary, method=method)
+        return str(result)
 
 
 __all__ = ["TestAgent"]

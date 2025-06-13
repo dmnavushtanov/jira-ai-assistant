@@ -22,14 +22,33 @@ def create_planning_pipeline(
     method_prompt: PromptTemplate,
     context_prompt: PromptTemplate,
     test_prompt: PromptTemplate,
-) -> Any:
+) -> SequentialChain | None:
     """Return a SequentialChain for method detection, context analysis and test generation."""
-    if None in (LLMChain, SequentialChain):
-        logger.warning("LangChain not installed; cannot create planning pipeline")
+    if None in (LLMChain, SequentialChain, method_prompt, context_prompt, test_prompt, llm):
+        logger.warning("Planning pipeline not available")
         return None
-    method_chain = LLMChain(llm=llm, prompt=method_prompt, output_key="method")
-    context_chain = LLMChain(llm=llm, prompt=context_prompt, output_key="summary")
-    test_chain = LLMChain(llm=llm, prompt=test_prompt, output_key="test_cases")
+
+    # Step 1: detect HTTP method
+    method_chain = LLMChain(
+        llm=llm,
+        prompt=method_prompt,
+        output_key="method",
+    )
+
+    # Step 2: analyze context
+    context_chain = LLMChain(
+        llm=llm,
+        prompt=context_prompt,
+        output_key="summary",
+    )
+
+    # Step 3: generate test cases
+    test_chain = LLMChain(
+        llm=llm,
+        prompt=test_prompt,
+        output_key="test_cases",
+    )
+
     return SequentialChain(
         chains=[method_chain, context_chain, test_chain],
         input_variables=["question", "jira_content"],
