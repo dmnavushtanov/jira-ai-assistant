@@ -120,7 +120,7 @@ class TestAgent:
                 self.react_agent = initialize_agent(
                     tools=self.tools,
                     llm=self.llm,
-                    agent=AgentType.REACT_DESCRIPTION,
+                    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
                     verbose=True,
                 )
 
