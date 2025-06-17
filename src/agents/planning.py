@@ -20,10 +20,10 @@ logger.debug("planning module loaded")
 
 def create_planning_pipeline(
     llm: Any,
-    method_prompt: PromptTemplate,
-    context_prompt: PromptTemplate,
-    test_prompt: PromptTemplate,
-) -> SequentialChain | None:
+    method_prompt: PromptTemplate, # type: ignore
+    context_prompt: PromptTemplate, # type: ignore
+    test_prompt: PromptTemplate, # type: ignore
+) -> SequentialChain | None: # type: ignore
     """Return a SequentialChain for method detection, context analysis and test generation."""
     if None in (LLMChain, SequentialChain, method_prompt, context_prompt, test_prompt, llm):
         logger.warning("Planning pipeline not available")
