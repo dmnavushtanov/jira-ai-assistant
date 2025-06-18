@@ -10,6 +10,7 @@ from src.services.jira_service import (
     add_comment_to_issue_tool,
     create_jira_issue_tool,
     fill_field_by_label_tool,
+    get_issue_transitions_tool,
     update_issue_fields_tool,
     transition_issue_tool,
 )
@@ -37,6 +38,7 @@ class JiraOperationsAgent:
             add_comment_to_issue_tool,
             create_jira_issue_tool,
             fill_field_by_label_tool,
+            get_issue_transitions_tool,
             update_issue_fields_tool,
             transition_issue_tool,
         ]
