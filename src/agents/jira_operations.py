@@ -112,7 +112,9 @@ class JiraOperationsAgent:
             logger.debug("Failed to parse fill_field_by_label response")
             return result_json
 
-    def _choose_transition(self, requested: str, transitions: list[dict[str, Any]], **kwargs: Any) -> str | None:
+    def _choose_transition(
+        self, requested: str, transitions: list[dict[str, Any]], **kwargs: Any
+    ) -> str | None:
         """Return the best matching transition using the LLM."""
         if not transitions or not self.transition_prompt:
             return None
@@ -160,15 +162,18 @@ class JiraOperationsAgent:
 
         The available transitions are retrieved first and ``transition`` is
         compared case-insensitively against the available names. If no direct
-        match is found, the LLM is asked to select the best transition. When the
-        desired status cannot be resolved a message listing the available
-        options is returned so the user can decide how to proceed.
+        match is found, the user is prompted with the available options so they
+        can decide which status to use. The LLM may suggest a close match, but
+        the issue is not transitioned automatically when the requested status is
+        unavailable.
         """
 
         if transition is None:
             transition = kwargs.pop("transition_name", None)
         if not transition:
-            raise TypeError("transition_issue requires 'transition' or 'transition_name'")
+            raise TypeError(
+                "transition_issue requires 'transition' or 'transition_name'"
+            )
 
         logger.info("Transitioning %s using %s", issue_id, transition)
 
@@ -193,33 +198,25 @@ class JiraOperationsAgent:
                 match = t
                 break
 
-
         if match is None:
-            ai_choice = self._choose_transition(transition, transitions, **kwargs)
-            if ai_choice:
-                desired_ai = ai_choice.strip().lower()
-                for t in transitions:
-                    tid = str(t.get("id"))
-                    name = t.get("name") or t.get("to", {}).get("name")
-                    if desired_ai in {_normalize(tid), _normalize(name)}:
-                        match = t
-                        break
-
-        if match is None:
+            suggestion = self._choose_transition(transition, transitions, **kwargs)
             available = [
                 str(t.get("name") or t.get("to", {}).get("name"))
                 for t in transitions
                 if t.get("name") or t.get("to", {}).get("name")
             ]
-            logger.warning(
-                "Transition '%s' not available for %s", transition, issue_id
-            )
-            return (
+            logger.warning("Transition '%s' not available for %s", transition, issue_id)
+            message = (
                 f"Transition '{transition}' is not available for {issue_id}. "
                 f"Available statuses: {', '.join(available)}. "
-                "Which status should I use, or would you like to ask another "
-                "question?"
             )
+            if suggestion:
+                message += (
+                    f"Did you mean '{suggestion}'? Please specify the status to use."
+                )
+            else:
+                message += "Which status should I use?"
+            return message
 
         matched_name = str(match.get("name") or match.get("to", {}).get("name"))
         payload = json.dumps({"issue_id": issue_id, "transition": matched_name})
@@ -309,9 +306,7 @@ class JiraOperationsAgent:
                 transition = plan.get("transition")
                 if not issue or not transition:
                     return "Missing issue_id or transition for transition_issue"
-                result = self.transition_issue(
-                    str(issue), str(transition), **kwargs
-                )
+                result = self.transition_issue(str(issue), str(transition), **kwargs)
                 return json.dumps(result)
         except Exception:
             logger.exception("Failed to execute operation")
