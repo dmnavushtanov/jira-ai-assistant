@@ -11,6 +11,7 @@ from src.services.jira_service import (
     create_jira_issue_tool,
     fill_field_by_label_tool,
     update_issue_fields_tool,
+    transition_issue_tool,
 )
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
@@ -37,6 +38,7 @@ class JiraOperationsAgent:
             create_jira_issue_tool,
             fill_field_by_label_tool,
             update_issue_fields_tool,
+            transition_issue_tool,
         ]
 
         self.plan_prompt = load_prompt("jira_operations.txt")
@@ -105,6 +107,17 @@ class JiraOperationsAgent:
             return json.loads(result_json)
         except Exception:
             logger.debug("Failed to parse fill_field_by_label response")
+            return result_json
+
+    def transition_issue(self, issue_id: str, transition: str, **kwargs: Any) -> str:
+        """Move ``issue_id`` to a new workflow status."""
+        logger.info("Transitioning %s using %s", issue_id, transition)
+        payload = json.dumps({"issue_id": issue_id, "transition": transition})
+        result_json = transition_issue_tool.run(payload)
+        try:
+            return json.loads(result_json)
+        except Exception:
+            logger.debug("Failed to parse transition_issue response")
             return result_json
 
     # ------------------------------------------------------------------
@@ -179,6 +192,15 @@ class JiraOperationsAgent:
                     return "Missing issue_id or field_label for fill_field_by_label"
                 result = self.fill_field_by_label(
                     str(issue), str(label), str(value), **kwargs
+                )
+                return json.dumps(result)
+            if action == "transition_issue":
+                issue = plan.get("issue_id") or issue_id
+                transition = plan.get("transition")
+                if not issue or not transition:
+                    return "Missing issue_id or transition for transition_issue"
+                result = self.transition_issue(
+                    str(issue), str(transition), **kwargs
                 )
                 return json.dumps(result)
         except Exception:

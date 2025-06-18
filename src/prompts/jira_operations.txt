@@ -4,6 +4,7 @@ Supported actions:
 - create_issue: create a new issue. Requires "project_key", "summary", "description" and optional "issue_type".
 - fill_field_by_label: set a field value using its display label. Requires "issue_id", "field_label", and "value".
 - update_fields: update one or more fields using a JSON mapping. Requires "issue_id" and "fields" (object).
+- transition_issue: move an issue to a new status. Requires "issue_id" and "transition".
 The current issue is {issue_id}. Use it if the request does not specify one.
 Respond with a single JSON object describing the action to perform.
 If you are unsure, respond with {"action": "unknown"}.
