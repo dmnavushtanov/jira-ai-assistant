@@ -16,7 +16,6 @@ from src.configs.config import load_config
 from src.llm_clients import create_llm_client, create_langchain_llm
 from src.prompts import load_prompt
 from src.utils import safe_format
-from src.agents.planning import create_planning_pipeline
 
 try:
     from langchain.chains import LLMChain, SequentialChain  # type: ignore
@@ -77,9 +76,7 @@ class TestAgent:
                     input_variables=["question", "instruction"],
                     template="{instruction}\nQuestion: {question}\nMethod:",
                 )
-                self.method_prompt = base_method.partial(
-                    instruction=method_instruction
-                )
+                self.method_prompt = base_method.partial(instruction=method_instruction)
 
                 base_context = PromptTemplate(
                     input_variables=["jira_content", "method", "instruction"],
@@ -94,9 +91,7 @@ class TestAgent:
                     template="{instruction}\nMethod: {method}\nSummary: {summary}",
                 )
                 self._base_test_prompt = base_test
-                self.test_prompt = base_test.partial(
-                    instruction=self.default_prompt
-                )
+                self.test_prompt = base_test.partial(instruction=self.default_prompt)
 
         # Tools exposed by this agent
         self.tools = []
@@ -110,7 +105,11 @@ class TestAgent:
                 description="Generate test cases based on validation results.",
             )
             self.tools.append(self.generate_tests_tool)
-            if self.llm is not None and initialize_agent is not None and AgentType is not None:
+            if (
+                self.llm is not None
+                and initialize_agent is not None
+                and AgentType is not None
+            ):
                 self.plan_tests_tool = Tool(
                     name="PlanAndGenerateTests",
                     func=self.plan_and_generate,
@@ -123,7 +122,6 @@ class TestAgent:
                     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
                     verbose=True,
                 )
-
 
     def _extract_method(self, text: str) -> Optional[str]:
         """Return HTTP method found in ``text`` if any."""
@@ -162,7 +160,11 @@ class TestAgent:
         ):
             logger.info("Running planning pipeline for test generation")
             result = self.plan_and_generate(text, text, **kwargs)
-            return result if result and not result.upper().startswith("HAS_TESTS") else None
+            return (
+                result
+                if result and not result.upper().startswith("HAS_TESTS")
+                else None
+            )
 
         method = (method or self._extract_method(text) or "GET").upper()
         template = self.prompts.get(method) or self.default_prompt
@@ -200,11 +202,25 @@ class TestAgent:
         ):
             logger.warning("Planning pipeline not available")
             return None
-        return create_planning_pipeline(
-            self.llm,
-            self.method_prompt,
-            self.context_prompt,
-            self.test_prompt,
+        method_chain = LLMChain(
+            llm=self.llm,
+            prompt=self.method_prompt,
+            output_key="method",
+        )
+        context_chain = LLMChain(
+            llm=self.llm,
+            prompt=self.context_prompt,
+            output_key="summary",
+        )
+        test_chain = LLMChain(
+            llm=self.llm,
+            prompt=self.test_prompt,
+            output_key="test_cases",
+        )
+        return SequentialChain(
+            chains=[method_chain, context_chain, test_chain],
+            input_variables=["question", "jira_content"],
+            output_variables=["test_cases"],
         )
 
     def plan_and_generate(self, question: str, jira_content: str, **kwargs: Any) -> str:

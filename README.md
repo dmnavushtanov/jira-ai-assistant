@@ -125,6 +125,13 @@ print(result)
 When used with the `RouterAgent` any request starting with "create" is
 classified with the `CREATE` intent and routed through this agent.
 
+### Multi-step Operations
+
+The `PlanningAgent` can break down a request into multiple Jira actions. For
+example asking to add a comment and then move the ticket will produce a plan
+containing both steps. The router executes each step in order and reports which
+actions succeeded or failed.
+
 ### Error Handling
 
 The assistant now catches common issues such as invalid Jira keys or failures

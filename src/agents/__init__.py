@@ -15,6 +15,7 @@ from .jira_operations import JiraOperationsAgent
 from .router_agent import RouterAgent
 from .test_agent import TestAgent
 from .issue_creator import IssueCreatorAgent
+from .planning import PlanningAgent
 
 __all__ = [
     "ClassifierAgent",
@@ -24,5 +25,5 @@ __all__ = [
     "RouterAgent",
     "TestAgent",
     "IssueCreatorAgent",
+    "PlanningAgent",
 ]
-

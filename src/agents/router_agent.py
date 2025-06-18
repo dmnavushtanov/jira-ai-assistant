@@ -32,6 +32,7 @@ from src.agents.api_validator import ApiValidatorAgent
 from src.agents.jira_operations import JiraOperationsAgent
 from src.agents.test_agent import TestAgent
 from src.agents.issue_creator import IssueCreatorAgent
+from src.agents.planning import PlanningAgent
 from src.prompts import load_prompt
 from src.services.jira_service import get_issue_by_id_tool
 from src.utils import (
@@ -60,6 +61,7 @@ class RouterAgent:
         self.operations = JiraOperationsAgent(config_path)
         self.tester = TestAgent(config_path)
         self.creator = IssueCreatorAgent(config_path)
+        self.planner = PlanningAgent(config_path)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
         if self.use_memory:
@@ -244,9 +246,7 @@ class RouterAgent:
             return tests or ""
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
-            return (
-                f"Jira issue {issue_id} does not exist or you do not have permission to access it."
-            )
+            return f"Jira issue {issue_id} does not exist or you do not have permission to access it."
         except Exception:
             logger.exception("Failed to generate test cases")
             return "Not enough information to generate test cases."
@@ -275,6 +275,37 @@ class RouterAgent:
             if self._add_tests_to_description(issue_id, cleaned):
                 cleaned += "\n\nDescription updated with generated tests."
         return cleaned
+
+    def _execute_operations_plan(self, plan: dict[str, Any], **kwargs: Any) -> str:
+        """Execute a multi-step Jira operations plan."""
+        issue_key = plan.get("issue_key") or self.session_memory.current_issue
+        if not issue_key:
+            return "No Jira issue specified for execution"
+        steps = plan.get("plan") or []
+        if not isinstance(steps, list):
+            return "Plan did not contain actionable steps"
+        results = []
+        for step in steps:
+            agent = step.get("agent")
+            action = step.get("action")
+            params = step.get("parameters") or {}
+            if agent != "jira_operations":
+                results.append(f"Unknown agent {agent}")
+                continue
+            func = getattr(self.operations, action, None)
+            if not callable(func):
+                results.append(f"Unknown action {action}")
+                continue
+            try:
+                result = func(issue_key, **params, **kwargs)
+                if isinstance(result, str) and result.startswith("Error"):
+                    results.append(f"Failed {action}: {result}")
+                else:
+                    results.append(f"Executed {action} successfully")
+            except Exception as exc:
+                logger.exception("Failed step %s", action)
+                results.append(f"Failed {action}: {exc}")
+        return "\n".join(results)
 
     # ------------------------------------------------------------------
     # Public API
@@ -307,7 +338,15 @@ class RouterAgent:
             intent = self._classify_intent(question, **kwargs)
             if intent.startswith("OPERATE"):
                 logger.info("Routing to operations workflow")
-                answer = self.operations.operate(question, issue_id=issue_id, **kwargs)
+                plan = self.planner.generate_plan(
+                    question, {"issue_key": issue_id or ""}, **kwargs
+                )
+                if plan.get("plan"):
+                    answer = self._execute_operations_plan(plan, **kwargs)
+                else:
+                    answer = self.operations.operate(
+                        question, issue_id=issue_id, **kwargs
+                    )
             elif intent.startswith("CREATE"):
                 logger.info("Routing to issue creation workflow")
                 project_key = self._extract_project_key(question)
