@@ -9,8 +9,10 @@ try:
     from rich.traceback import install as install_rich_traceback
 except Exception:  # pragma: no cover - rich not installed
     RichHandler = None
+
     def install_rich_traceback():
         pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,7 @@ class Config:
     follow_related_jiras: bool
     write_comments_to_jira: bool
     ask_for_confirmation: bool
+    log_jira_payloads: bool
     validation_prompts_dir: str = "validation"
 
 
@@ -71,12 +74,12 @@ def load_config(path: str = None) -> Config:
     """Load configuration from YAML file and environment variables."""
     load_dotenv()
     logger.debug("Loading configuration from %s", path or "default config.yml")
-    
+
     # If no path provided, use default relative to this config.py file
     if path is None:
         config_dir = os.path.dirname(os.path.abspath(__file__))
         path = os.path.join(config_dir, "config.yml")
-    
+
     data = {}
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
@@ -104,18 +107,53 @@ def load_config(path: str = None) -> Config:
         debug=_env_bool("DEBUG", data.get("debug", False)),
         base_llm=data.get("base_llm", os.getenv("BASE_LLM", "openai")),
         openai_api_key=os.getenv("OPENAI_API_KEY", data.get("openai_api_key", "")),
-        openai_model=os.getenv("OPENAI_MODEL", data.get("openai_model", "gpt-3.5-turbo")),
-        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", data.get("anthropic_api_key", "")),
-        anthropic_model=os.getenv("ANTHROPIC_MODEL", data.get("anthropic_model", "claude-3-opus")),
-        projects=[p.strip().upper() for p in os.getenv("PROJECTS", ",".join(data.get("projects", []))).split(",") if p.strip()] or [],
-        include_whole_api_body=_env_bool("INCLUDE_WHOLE_API_BODY", data.get("include_whole_api_body", False)),
-        langchain_debug=_env_bool("LANGCHAIN_DEBUG", data.get("langchain_debug", False)),
+        openai_model=os.getenv(
+            "OPENAI_MODEL", data.get("openai_model", "gpt-3.5-turbo")
+        ),
+        anthropic_api_key=os.getenv(
+            "ANTHROPIC_API_KEY", data.get("anthropic_api_key", "")
+        ),
+        anthropic_model=os.getenv(
+            "ANTHROPIC_MODEL", data.get("anthropic_model", "claude-3-opus")
+        ),
+        projects=[
+            p.strip().upper()
+            for p in os.getenv("PROJECTS", ",".join(data.get("projects", []))).split(
+                ","
+            )
+            if p.strip()
+        ]
+        or [],
+        include_whole_api_body=_env_bool(
+            "INCLUDE_WHOLE_API_BODY", data.get("include_whole_api_body", False)
+        ),
+        langchain_debug=_env_bool(
+            "LANGCHAIN_DEBUG", data.get("langchain_debug", False)
+        ),
         rich_logging=_env_bool("RICH_LOGGING", data.get("rich_logging", True)),
-        conversation_memory=_env_bool("CONVERSATION_MEMORY", data.get("conversation_memory", False)),
-        max_questions_to_remember=_env_int("MAX_NUMBER_OF_QUESTIONS_TO_REMEMBER", data.get("max_questions_to_remember", 3)),
-        strip_unused_jira_data=_env_bool("STRIP_UNUSED_JIRA_DATA", data.get("strip_unused_jira_data", False)),
-        follow_related_jiras=_env_bool("FOLLOW_RELATED_JIRAS", data.get("follow_related_jiras", False)),
-        write_comments_to_jira=_env_bool("WRITE_COMMENTS_TO_JIRA", data.get("write_comments_to_jira", False)),
-        ask_for_confirmation=_env_bool("ASK_FOR_CONFIRMATION", data.get("ask_for_confirmation", False)),
-        validation_prompts_dir=os.getenv("VALIDATION_PROMPTS_DIR", data.get("validation_prompts_dir", "validation")),
+        conversation_memory=_env_bool(
+            "CONVERSATION_MEMORY", data.get("conversation_memory", False)
+        ),
+        max_questions_to_remember=_env_int(
+            "MAX_NUMBER_OF_QUESTIONS_TO_REMEMBER",
+            data.get("max_questions_to_remember", 3),
+        ),
+        strip_unused_jira_data=_env_bool(
+            "STRIP_UNUSED_JIRA_DATA", data.get("strip_unused_jira_data", False)
+        ),
+        follow_related_jiras=_env_bool(
+            "FOLLOW_RELATED_JIRAS", data.get("follow_related_jiras", False)
+        ),
+        write_comments_to_jira=_env_bool(
+            "WRITE_COMMENTS_TO_JIRA", data.get("write_comments_to_jira", False)
+        ),
+        ask_for_confirmation=_env_bool(
+            "ASK_FOR_CONFIRMATION", data.get("ask_for_confirmation", False)
+        ),
+        log_jira_payloads=_env_bool(
+            "LOG_JIRA_PAYLOADS", data.get("log_jira_payloads", True)
+        ),
+        validation_prompts_dir=os.getenv(
+            "VALIDATION_PROMPTS_DIR", data.get("validation_prompts_dir", "validation")
+        ),
     )
