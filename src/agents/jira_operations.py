@@ -146,8 +146,17 @@ class JiraOperationsAgent:
 
         return text
 
-    def transition_issue(self, issue_id: str, transition: str, **kwargs: Any) -> str:
+    def transition_issue(
+        self,
+        issue_id: str,
+        transition: str | None = None,
+        **kwargs: Any,
+    ) -> str:
         """Move ``issue_id`` to a new workflow status.
+
+        ``transition`` can be provided as a positional argument or via the
+        ``transition_name`` keyword in ``kwargs`` to handle variations in plan
+        parameters.
 
         The available transitions are retrieved first and ``transition`` is
         compared case-insensitively against the available names. If no direct
@@ -155,6 +164,11 @@ class JiraOperationsAgent:
         desired status cannot be resolved a message listing the available
         options is returned so the user can decide how to proceed.
         """
+
+        if transition is None:
+            transition = kwargs.pop("transition_name", None)
+        if not transition:
+            raise TypeError("transition_issue requires 'transition' or 'transition_name'")
 
         logger.info("Transitioning %s using %s", issue_id, transition)
 
