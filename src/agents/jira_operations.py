@@ -207,7 +207,7 @@ class JiraOperationsAgent:
             ]
             logger.warning("Transition '%s' not available for %s", transition, issue_id)
             message = (
-                f"Transition '{transition}' is not available for {issue_id}. "
+                f"Error: Transition '{transition}' is not available for {issue_id}. "
                 f"Available statuses: {', '.join(available)}. "
             )
             if suggestion:
