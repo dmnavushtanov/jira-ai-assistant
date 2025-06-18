@@ -1,0 +1,4 @@
+You are selecting a Jira workflow transition.
+User requested: {requested}
+Available transitions: {options}
+Return only the best matching transition name. If none are suitable, respond with NONE.
