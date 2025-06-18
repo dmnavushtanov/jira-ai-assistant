@@ -207,7 +207,7 @@ class JiraOperationsAgent:
             ]
             logger.warning("Transition '%s' not available for %s", transition, issue_id)
             message = (
-                f"Transition '{transition}' is not available for {issue_id}. "
+                f"Error: Transition '{transition}' is not available for {issue_id}. "
                 f"Available statuses: {', '.join(available)}. "
             )
             if suggestion:
@@ -215,7 +215,10 @@ class JiraOperationsAgent:
                     f"Did you mean '{suggestion}'? Please specify the status to use."
                 )
             else:
-                message += "Which status should I use?"
+                message += (
+                    "Which status should I use, or would you like to ask another "
+                    "question?"
+                )
             return message
 
         matched_name = str(match.get("name") or match.get("to", {}).get("name"))
