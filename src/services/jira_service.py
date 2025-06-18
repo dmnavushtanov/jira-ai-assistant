@@ -359,8 +359,16 @@ def transition_issue_func(issue_id: str, transition: str) -> str:
     cfg = load_config()
     if cfg.log_jira_payloads:
         logger.debug("Transition payload: %s", updated)
+        result = updated
+    else:
+        status = (
+            updated.get("fields", {})
+            .get("status", {})
+            .get("name", "")
+        )
+        result = {"key": updated.get("key", issue_id), "status": status}
     logger.info("Transitioned %s using %s", issue_id, transition)
-    return json.dumps(updated)
+    return json.dumps(result)
 
 
 def _transition_issue_wrapper(*args: str) -> str:
