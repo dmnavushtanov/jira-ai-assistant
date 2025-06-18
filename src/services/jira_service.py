@@ -23,16 +23,26 @@ def _get_jira_client() -> JiraClient:
         )
     logger.debug("Creating JiraClient for base_url=%s email=%s", base_url, email)
     logger.info("JiraClient initialized for %s", base_url)
-    return JiraClient(base_url, email, token, strip_unused_payload=cfg.strip_unused_jira_data)
+    return JiraClient(
+        base_url,
+        email,
+        token,
+        strip_unused_payload=cfg.strip_unused_jira_data,
+        log_payloads=cfg.log_jira_payloads,
+    )
 
 
 # --- Tool for getting issue details by ID ---
+
 
 def get_issue_by_id_func(issue_id: str) -> str:
     """Fetch details for a given Jira issue ID."""
     logger.debug("Getting issue by ID: %s", issue_id)
     client = _get_jira_client()
     issue = client.get_issue(issue_id)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Issue payload: %s", issue)
     logger.info("Fetched issue %s", issue_id)
     return json.dumps(issue)
 
@@ -48,6 +58,7 @@ get_issue_by_id_tool = Tool(
 
 
 # --- Tool for creating a new Jira issue ---
+
 
 def create_jira_issue_func(
     summary: str,
@@ -65,9 +76,7 @@ def create_jira_issue_func(
     )
     from src.utils import confirm_action
 
-    if not confirm_action(
-        f"Create issue in {project_key} with summary '{summary}'?"
-    ):
+    if not confirm_action(f"Create issue in {project_key} with summary '{summary}'?"):
         logger.info("User declined to create issue in %s", project_key)
         return "Creation cancelled by user"
     client = _get_jira_client()
@@ -80,6 +89,9 @@ def create_jira_issue_func(
     if parent_key:
         fields["parent"] = {"key": parent_key}
     issue = client.create_issue(fields)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Created issue payload: %s", issue)
     logger.info(
         "Created issue %s in project %s",
         issue.get("key", "unknown"),
@@ -101,11 +113,15 @@ create_jira_issue_tool = Tool(
 
 # --- Tool for fetching comments of an issue ---
 
+
 def get_issue_comments_func(issue_id: str) -> str:
     """Fetch comments for a given Jira issue ID."""
     logger.debug("Fetching comments for issue %s", issue_id)
     client = _get_jira_client()
     comments = client.get_comments(issue_id)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Comments payload: %s", comments)
     logger.info("Retrieved %d comments for issue %s", len(comments), issue_id)
     return json.dumps(comments)
 
@@ -113,19 +129,21 @@ def get_issue_comments_func(issue_id: str) -> str:
 get_issue_comments_tool = Tool(
     name="get_issue_comments",
     func=get_issue_comments_func,
-    description=(
-        "Return all comments for a Jira issue key as JSON."
-    ),
+    description=("Return all comments for a Jira issue key as JSON."),
 )
 
 
 # --- Tool for fetching the changelog/history of an issue ---
+
 
 def get_issue_history_func(issue_id: str) -> str:
     """Fetch the changelog for a given Jira issue ID."""
     logger.debug("Fetching changelog for issue %s", issue_id)
     client = _get_jira_client()
     changelog = client.get_changelog(issue_id)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Changelog payload: %s", changelog)
     logger.info("Fetched changelog for issue %s", issue_id)
     return json.dumps(changelog)
 
@@ -133,12 +151,11 @@ def get_issue_history_func(issue_id: str) -> str:
 get_issue_history_tool = Tool(
     name="get_issue_history",
     func=get_issue_history_func,
-    description=(
-        "Return the change history (changelog) for a Jira issue key as JSON."
-    ),
+    description=("Return the change history (changelog) for a Jira issue key as JSON."),
 )
 
 # --- Tool for fetching subtasks and linked issues ---
+
 
 def get_related_issues_func(issue_id: str) -> str:
     """Return subtasks and linked issues for the given ticket.
@@ -149,6 +166,9 @@ def get_related_issues_func(issue_id: str) -> str:
     logger.debug("Fetching related issues for %s", issue_id)
     client = _get_jira_client()
     related = client.get_related_issues(issue_id)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Related issues payload: %s", related)
     logger.info("Fetched related issues for %s", issue_id)
     return json.dumps(related)
 
@@ -164,6 +184,7 @@ get_related_issues_tool = Tool(
 
 # --- Tool for adding a comment to an issue ---
 
+
 def add_comment_to_issue_func(issue_id: str, comment: str) -> str:
     """Add a comment to the specified issue."""
     logger.debug("Adding comment to issue %s", issue_id)
@@ -174,6 +195,9 @@ def add_comment_to_issue_func(issue_id: str, comment: str) -> str:
         return "Comment creation cancelled by user"
     client = _get_jira_client()
     result = client.add_comment(issue_id, comment)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Add comment payload: %s", result)
     logger.info("Added comment to issue %s", issue_id)
     return json.dumps(result)
 
@@ -200,6 +224,7 @@ def _add_comment_wrapper(*args: str) -> str:
 
     return add_comment_to_issue_func(issue_id.strip(), comment.strip())
 
+
 add_comment_to_issue_tool = Tool(
     name="add_comment_to_issue",
     func=_add_comment_wrapper,
@@ -210,6 +235,7 @@ add_comment_to_issue_tool = Tool(
 )
 
 # --- Tool for updating fields of an issue ---
+
 
 def update_issue_fields_func(issue_id: str, fields_json: str) -> str:
     """Update one or more fields on the given issue.
@@ -225,24 +251,26 @@ def update_issue_fields_func(issue_id: str, fields_json: str) -> str:
     client = _get_jira_client()
     fields: Dict[str, Any] = json.loads(fields_json)
     updated = client.update_issue(issue_id, fields)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Update fields payload: %s", updated)
     logger.info("Updated issue %s", issue_id)
     return json.dumps(updated)
 
 
 def fill_field_by_label_func(issue_id: str, field_label: str, value: str) -> str:
     """Update an issue field using its display label."""
-    logger.debug(
-        "Filling field %s on %s with value %s", field_label, issue_id, value
-    )
+    logger.debug("Filling field %s on %s with value %s", field_label, issue_id, value)
     from src.utils import confirm_action
 
-    if not confirm_action(
-        f"Set '{field_label}' on {issue_id} to '{value}'?"
-    ):
+    if not confirm_action(f"Set '{field_label}' on {issue_id} to '{value}'?"):
         logger.info("User declined to update %s", issue_id)
         return "Field update cancelled by user"
     client = _get_jira_client()
     updated = client.set_field_by_label(issue_id, field_label, value)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Fill field payload: %s", updated)
     logger.info("Updated %s on %s", field_label, issue_id)
     return json.dumps(updated)
 
@@ -266,9 +294,7 @@ def _fill_field_by_label_wrapper(*args: str) -> str:
     elif len(args) == 3:
         issue_id, field_label, value = args
     else:
-        raise TypeError(
-            "fill_field_by_label expects issue_id, field_label and value"
-        )
+        raise TypeError("fill_field_by_label expects issue_id, field_label and value")
 
     return fill_field_by_label_func(
         issue_id.strip(), field_label.strip(), value.strip()

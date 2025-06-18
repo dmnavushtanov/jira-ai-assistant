@@ -18,3 +18,4 @@ follow_related_jiras: true
 validation_prompts_dir: validation
 write_comments_to_jira: true
 ask_for_confirmation: false
+log_jira_payloads: true
