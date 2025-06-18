@@ -182,6 +182,27 @@ get_related_issues_tool = Tool(
     ),
 )
 
+# --- Tool for fetching available transitions for an issue ---
+
+
+def get_issue_transitions_func(issue_id: str) -> str:
+    """Return workflow transitions available for ``issue_id``."""
+    logger.debug("Fetching transitions for %s", issue_id)
+    client = _get_jira_client()
+    transitions = client.get_transitions(issue_id)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Transitions payload: %s", transitions)
+    logger.info("Fetched %d transitions for %s", len(transitions), issue_id)
+    return json.dumps(transitions)
+
+
+get_issue_transitions_tool = Tool(
+    name="get_issue_transitions",
+    func=get_issue_transitions_func,
+    description=("Return available workflow transitions for a Jira issue key as JSON."),
+)
+
 # --- Tool for adding a comment to an issue ---
 
 
@@ -382,6 +403,7 @@ jira_tools = [
     get_issue_comments_tool,
     get_issue_history_tool,
     get_related_issues_tool,
+    get_issue_transitions_tool,
     add_comment_to_issue_tool,
     fill_field_by_label_tool,
     update_issue_fields_tool,
@@ -394,6 +416,7 @@ __all__ = [
     "get_issue_comments_tool",
     "get_issue_history_tool",
     "get_related_issues_tool",
+    "get_issue_transitions_tool",
     "add_comment_to_issue_tool",
     "fill_field_by_label_tool",
     "update_issue_fields_tool",
