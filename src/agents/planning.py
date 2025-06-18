@@ -1,60 +1,60 @@
-"""Utilities for creating multi-step planning chains."""
+"""Agent for generating multi-step plans from user requests."""
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Any
+from typing import Any, Dict
 
-
-try:
-    from langchain.chains import LLMChain, SequentialChain  # type: ignore
-    from langchain.prompts import PromptTemplate  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    LLMChain = None  # type: ignore
-    SequentialChain = None  # type: ignore
-    PromptTemplate = object  # type: ignore
+from src.configs.config import load_config
+from src.llm_clients import create_llm_client
+from src.prompts import load_prompt
+from src.utils import safe_format, parse_json_block
 
 logger = logging.getLogger(__name__)
 logger.debug("planning module loaded")
 
 
-def create_planning_pipeline(
-    llm: Any,
-    method_prompt: PromptTemplate, # type: ignore
-    context_prompt: PromptTemplate, # type: ignore
-    test_prompt: PromptTemplate, # type: ignore
-) -> SequentialChain | None: # type: ignore
-    """Return a SequentialChain for method detection, context analysis and test generation."""
-    if None in (LLMChain, SequentialChain, method_prompt, context_prompt, test_prompt, llm):
-        logger.warning("Planning pipeline not available")
-        return None
+class PlanningAgent:
+    """Generate a structured execution plan for Jira operations."""
 
-    # Step 1: detect HTTP method
-    method_chain = LLMChain(
-        llm=llm,
-        prompt=method_prompt,
-        output_key="method",
-    )
+    def __init__(self, config_path: str | None = None) -> None:
+        logger.debug("Initializing PlanningAgent with config_path=%s", config_path)
+        self.config = load_config(config_path)
+        self.client = create_llm_client(config_path)
+        self.plan_prompt = load_prompt("operations_plan.txt")
 
-    # Step 2: analyze context
-    context_chain = LLMChain(
-        llm=llm,
-        prompt=context_prompt,
-        output_key="summary",
-    )
+    def generate_plan(
+        self,
+        user_request: str,
+        issue_context: Dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Return a plan describing the steps to satisfy ``user_request``."""
+        if not self.plan_prompt:
+            raise RuntimeError("Plan prompt not found")
 
-    # Step 3: generate test cases
-    test_chain = LLMChain(
-        llm=llm,
-        prompt=test_prompt,
-        output_key="test_cases",
-    )
+        context_json = json.dumps(issue_context or {}, indent=2)
+        prompt = safe_format(
+            self.plan_prompt,
+            {"user_request": user_request, "issue_context": context_json},
+        )
+        messages = [{"role": "user", "content": prompt}]
+        response = self.client.chat_completion(messages, **kwargs)
+        try:
+            text = response.choices[0].message.content.strip()
+        except Exception:
+            try:
+                text = response["choices"][0]["message"]["content"].strip()
+            except Exception:
+                logger.exception("Failed to parse planning response")
+                return {"plan": []}
+        plan = parse_json_block(text)
+        if isinstance(plan, dict) and isinstance(plan.get("plan"), list):
+            logger.debug("Generated plan: %s", plan)
+            return plan
+        logger.warning("Invalid plan structure received: %s", text)
+        return {"plan": []}
 
-    return SequentialChain(
-        chains=[method_chain, context_chain, test_chain],
-        input_variables=["question", "jira_content"],
-        output_variables=["test_cases"],
-    )
 
-
-__all__ = ["create_planning_pipeline"]
+__all__ = ["PlanningAgent"]
