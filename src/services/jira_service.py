@@ -322,6 +322,59 @@ update_issue_fields_tool = Tool(
 )
 
 
+# --- Tool for transitioning an issue to a new status ---
+
+
+def transition_issue_func(issue_id: str, transition: str) -> str:
+    """Move ``issue_id`` to the specified workflow state."""
+    logger.debug("Transitioning %s using %s", issue_id, transition)
+    from src.utils import confirm_action
+
+    if not confirm_action(f"Transition {issue_id} using '{transition}'?"):
+        logger.info("User declined to transition %s", issue_id)
+        return "Transition cancelled by user"
+    client = _get_jira_client()
+    updated = client.transition_issue(issue_id, transition)
+    cfg = load_config()
+    if cfg.log_jira_payloads:
+        logger.debug("Transition payload: %s", updated)
+    logger.info("Transitioned %s using %s", issue_id, transition)
+    return json.dumps(updated)
+
+
+def _transition_issue_wrapper(*args: str) -> str:
+    """Wrapper allowing single or dual argument invocation."""
+    if len(args) == 1:
+        text = args[0]
+        try:
+            data = json.loads(text)
+            issue_id = data["issue_id"]
+            transition = data["transition"]
+        except Exception:
+            if "|" in text:
+                issue_id, transition = text.split("|", 1)
+            else:
+                raise TypeError(
+                    "transition_issue requires 'issue_id|transition' or JSON"
+                )
+    elif len(args) == 2:
+        issue_id, transition = args
+    else:
+        raise TypeError("transition_issue expects issue_id and transition")
+
+    return transition_issue_func(issue_id.strip(), transition.strip())
+
+
+transition_issue_tool = Tool(
+    name="transition_issue",
+    func=_transition_issue_wrapper,
+    description=(
+        "Transition a Jira issue to a new workflow state. Provide the issue "
+        "key and the transition name or ID. Returns the updated issue JSON."
+    ),
+)
+
+
 # Collection of available Jira tools
 jira_tools = [
     get_issue_by_id_tool,
@@ -332,6 +385,7 @@ jira_tools = [
     add_comment_to_issue_tool,
     fill_field_by_label_tool,
     update_issue_fields_tool,
+    transition_issue_tool,
 ]
 
 __all__ = [
@@ -343,5 +397,6 @@ __all__ = [
     "add_comment_to_issue_tool",
     "fill_field_by_label_tool",
     "update_issue_fields_tool",
+    "transition_issue_tool",
     "jira_tools",
 ]

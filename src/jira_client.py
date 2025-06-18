@@ -176,3 +176,34 @@ class JiraClient:
         if self._log_payloads:
             logger.debug("Field update payload for %s: %s", issue_key, cleaned)
         return cleaned
+
+    def get_transitions(self, issue_key: str) -> List[Dict[str, Any]]:
+        """Return the workflow transitions available for ``issue_key``."""
+        logger.debug("Fetching transitions for %s", issue_key)
+        transitions = self._jira.transitions(issue_key)
+        cleaned = [strip_nulls(t) for t in transitions]
+        if self._strip_unused:
+            cleaned = [strip_unused_jira_data(t) for t in cleaned]
+        if self._log_payloads:
+            logger.debug("Transitions for %s: %s", issue_key, cleaned)
+        return cleaned
+
+    def transition_issue(self, issue_key: str, transition: str) -> Dict[str, Any]:
+        """Move ``issue_key`` to the workflow state ``transition``."""
+        logger.debug("Transitioning %s using %s", issue_key, transition)
+        transitions = self._jira.transitions(issue_key)
+        transition_id = None
+        for t in transitions:
+            tid = str(t.get("id"))
+            name = str(t.get("name", ""))
+            if transition.lower() in (tid.lower(), name.lower()):
+                transition_id = tid
+                break
+        if not transition_id:
+            raise ValueError(f"Transition '{transition}' not available for {issue_key}")
+        self._jira.transition_issue(issue_key, transition_id)
+        issue = self._jira.issue(issue_key)
+        cleaned = JiraUtils.clean_issue(issue.raw, strip_unused=self._strip_unused)
+        if self._log_payloads:
+            logger.debug("Transitioned issue payload for %s: %s", issue_key, cleaned)
+        return cleaned
