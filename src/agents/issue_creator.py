@@ -26,12 +26,14 @@ class IssueCreatorAgent:
         self.operations = JiraOperationsAgent(config_path)
         self.plan_prompt = load_prompt("issue_plan.txt")
 
-    def plan_issue(self, request: str, **kwargs: Any) -> dict[str, Any]:
+    def plan_issue(self, request: str, history: str = "", **kwargs: Any) -> dict[str, Any]:
         """Return structured issue info extracted from ``request``."""
         if not self.plan_prompt:
             raise RuntimeError("Issue planning prompt not found")
         template = self.plan_prompt
         prompt = safe_format(template, {"request": request})
+        if history:
+            prompt = f"Previous conversation:\n{history}\n\nCurrent request:\n{prompt}"
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         text = self.client.extract_text(response)
@@ -41,9 +43,11 @@ class IssueCreatorAgent:
         logger.debug("Plan not JSON: %s", text)
         return {}
 
-    def create_issue(self, request: str, project_key: str, **kwargs: Any) -> str:
+    def create_issue(
+        self, request: str, project_key: str, history: str = "", **kwargs: Any
+    ) -> str:
         """Create a Jira issue using details from ``request``."""
-        plan = self.plan_issue(request, **kwargs)
+        plan = self.plan_issue(request, history=history, **kwargs)
         summary = plan.get("summary") or "New Issue"
         description = plan.get("description", "")
         issue_type = str(plan.get("issue_type", "Task"))

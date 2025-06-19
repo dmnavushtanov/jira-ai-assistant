@@ -146,7 +146,7 @@ class TestAgent:
         return match.group(1).upper() if match else None
 
     def create_test_cases(
-        self, text: str, method: Optional[str] = None, **kwargs: Any
+        self, text: str, method: Optional[str] = None, history: str = "", **kwargs: Any
     ) -> str:
         """Return generated test cases or a message when they already exist.
 
@@ -155,6 +155,9 @@ class TestAgent:
         short explanatory message. Otherwise the response contains the new
         tests which are returned as-is.
         """
+
+        if history:
+            text = f"Previous conversation:\n{history}\n\nCurrent test request:\n{text}"
 
         if None not in (
             self.llm,
