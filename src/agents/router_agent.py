@@ -189,6 +189,23 @@ class RouterAgent:
         logger.debug("Needs history: %s (label=%s)", result, label)
         return result
 
+    def _check_history_limit(self) -> str | None:
+        """Reset chat history when it grows too large.
+
+        When LangChain memory isn't available the CLI prompt normally asks the
+        user to start a new conversation once ``max_history`` is exceeded. In a
+        non-interactive setting there is no opportunity for user input. This
+        helper automatically clears :class:`JiraContextMemory` and returns a
+        notice to the caller when the limit has been reached.
+        """
+        if self.use_memory or self.session_memory is None:
+            return None
+        if len(self.session_memory.chat_history) >= 2 * self.max_history:
+            logger.info("History limit reached; resetting session memory")
+            self.session_memory.clear()
+            return "Starting a new conversation due to length."
+        return None
+
     def _classify_and_validate(self, issue_id: str, **kwargs: Any) -> str:
         logger.info("Running classification/validation flow for %s", issue_id)
         issue_json = get_issue_by_id_tool.run(issue_id)
@@ -335,6 +352,8 @@ class RouterAgent:
         logger.info("Router received question: %s", question)
         used_executor = False
 
+        notice = self._check_history_limit()
+
         if self._pending_confirmation:
             user_reply = question.strip().lower()
             issue = self._confirm_issue
@@ -441,6 +460,8 @@ class RouterAgent:
             answer = "Sorry, something went wrong while handling your request."
         if self.use_memory and self.memory is not None and not used_executor:
             self.memory.save_context({"input": question}, {"output": answer})
+        if notice:
+            answer = f"{notice}\n\n{answer}"
         self.session_memory.save_context({"input": question}, {"output": answer})
         return answer
 
