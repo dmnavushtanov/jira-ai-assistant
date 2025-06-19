@@ -97,7 +97,7 @@ The `/ask` endpoint accepts a JSON payload containing a `question` field and ret
 
 ### Test Case Generation
 
-Ask the assistant for test cases and it will attempt to generate them directly. Validation can be run separately if needed. The generation step first checks the description for existing tests and returns `HAS_TESTS` when they are found. When LangChain is installed the **TestAgent** now runs a planning pipeline that detects the HTTP method and summarizes the context before generating tests. If the method cannot be identified, the default prompt is used. If the ticket lacks enough details the assistant will reply "Not enough information to generate test cases." otherwise it returns basic scenarios. A ReAct agent is also created from these tools so the pipeline can be invoked externally when needed.
+Ask the assistant for test cases and it will attempt to generate them directly. Validation can be run separately if needed. The generation step first checks the description for existing tests and informs you when they are already present instead of generating new ones. When LangChain is installed the **TestAgent** now runs a planning pipeline that detects the HTTP method and summarizes the context before generating tests. If the method cannot be identified, the default prompt is used. If the ticket lacks enough details the assistant will reply "Not enough information to generate test cases." otherwise it returns basic scenarios. A ReAct agent is also created from these tools so the pipeline can be invoked externally when needed.
 
 When tests are successfully generated they are appended to the end of the issue's
 **Description** field using the Jira API.
