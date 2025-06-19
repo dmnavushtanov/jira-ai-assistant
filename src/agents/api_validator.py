@@ -47,8 +47,12 @@ class ApiValidatorAgent:
             str(Path(self.config.validation_prompts_dir) / "general.txt")
         )
 
-    def validate(self, issue: Dict[str, Any], **kwargs: Any) -> Any:
-        """Validate ``issue`` according to its status using the configured LLM."""
+    def validate(self, issue: Dict[str, Any], history: str = "", **kwargs: Any) -> Any:
+        """Validate ``issue`` according to its status using the configured LLM.
+
+        When ``history`` is provided it is prepended to the prompt so follow-up
+        questions retain context.
+        """
         fields = issue.get("fields", {})
         status = fields.get("status", {}).get("name", "").replace(" ", "").lower()
         logger.info("Validating issue %s with status %s", issue.get("key"), status)
@@ -75,6 +79,10 @@ class ApiValidatorAgent:
         except Exception:
             logger.exception("Failed to format prompt")
             return ""
+        if history:
+            prompt = (
+                f"Previous conversation:\n{history}\n\nCurrent validation request:\n" + prompt
+            )
         logger.debug("Prompt for validation: %s", prompt)
         messages = []
         if "Issue Details:" in prompt:

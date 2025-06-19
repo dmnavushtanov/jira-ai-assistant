@@ -246,7 +246,7 @@ class JiraOperationsAgent:
     # Natural language operation handling
     # ------------------------------------------------------------------
     def _plan_operation(
-        self, question: str, issue_id: str | None = None, **kwargs: Any
+        self, question: str, issue_id: str | None = None, history: str = "", **kwargs: Any
     ) -> dict[str, Any]:
         """Return an action plan dict for ``question`` using the LLM."""
         if not self.plan_prompt:
@@ -255,6 +255,8 @@ class JiraOperationsAgent:
         prompt = safe_format(
             template, {"question": question, "issue_id": issue_id or ""}
         )
+        if history:
+            prompt = f"Previous conversation:\n{history}\n\nCurrent request:\n{prompt}"
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         text = self.client.extract_text(response)
@@ -273,9 +275,11 @@ class JiraOperationsAgent:
             return result
         return json.dumps(result)
 
-    def operate(self, question: str, issue_id: str | None = None, **kwargs: Any) -> str:
+    def operate(
+        self, question: str, issue_id: str | None = None, history: str = "", **kwargs: Any
+    ) -> str:
         """Execute an operation described by ``question``."""
-        plan = self._plan_operation(question, issue_id=issue_id, **kwargs)
+        plan = self._plan_operation(question, issue_id=issue_id, history=history, **kwargs)
         action = str(plan.get("action", "unknown")).lower()
         try:
             if action == "add_comment":
