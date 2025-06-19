@@ -100,7 +100,6 @@ class RouterAgent:
         else:
             pattern = r"[A-Za-z][A-Za-z0-9]+"
         self.issue_re = re.compile(rf"(?:{pattern})-\d+", re.IGNORECASE)
-        self.router_prompt = load_prompt("router.txt")
         self.history_prompt = load_prompt("needs_history.txt")
         self.intent_prompt = load_prompt("intent_classifier.txt")
 
