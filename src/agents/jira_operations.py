@@ -14,6 +14,7 @@ from src.services.jira_service import (
     update_issue_fields_tool,
     transition_issue_tool,
 )
+from src.agents.issue_insights import IssueInsightsAgent
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
@@ -32,6 +33,7 @@ class JiraOperationsAgent:
         )
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
+        self.insights = IssueInsightsAgent(config_path)
 
         # Tools available to this agent
         self.tools = [
@@ -111,6 +113,15 @@ class JiraOperationsAgent:
         except Exception:
             logger.debug("Failed to parse fill_field_by_label response")
             return result_json
+
+    def get_issue_summary(self, issue_id: str, **kwargs: Any) -> str:
+        """Return a short summary for ``issue_id`` using the insights agent."""
+        logger.info("Fetching summary for %s", issue_id)
+        try:
+            return self.insights.summarize(issue_id, **kwargs)
+        except Exception:
+            logger.exception("Failed to get issue summary for %s", issue_id)
+            return "Error fetching summary"
 
     def _choose_transition(
         self, requested: str, transitions: list[dict[str, Any]], **kwargs: Any
@@ -301,6 +312,12 @@ class JiraOperationsAgent:
                 result = self.fill_field_by_label(
                     str(issue), str(label), str(value), **kwargs
                 )
+                return self._format_result(result)
+            if action == "get_issue_summary":
+                issue = plan.get("issue_id") or issue_id
+                if not issue:
+                    return "Missing issue_id for get_issue_summary"
+                result = self.get_issue_summary(str(issue), **kwargs)
                 return self._format_result(result)
             if action == "transition_issue":
                 issue = plan.get("issue_id") or issue_id
