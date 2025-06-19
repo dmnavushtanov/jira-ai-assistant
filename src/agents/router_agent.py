@@ -18,14 +18,16 @@ try:
         ConversationSummaryMemory,
         CombinedMemory,
     )
-    from langchain_openai import ChatOpenAI
+    from langchain.agents import initialize_agent, AgentType  # type: ignore
 except Exception:  # pragma: no cover - optional dependency
     ConversationBufferWindowMemory = None
     ConversationSummaryMemory = None
     CombinedMemory = None
-    ChatOpenAI = None
+    initialize_agent = None  # type: ignore
+    AgentType = None  # type: ignore
 
 from src.configs.config import load_config
+from src.llm_clients import create_langchain_llm
 from src.agents.classifier import ClassifierAgent
 from src.agents.issue_insights import IssueInsightsAgent
 from src.agents.api_validator import ApiValidatorAgent
@@ -68,34 +70,28 @@ class RouterAgent:
         self._confirm_issue: str | None = None
         self._confirm_comment: str | None = None
         if self.use_memory:
-            if None in (
-                ConversationBufferWindowMemory,
-                CombinedMemory,
-                ChatOpenAI,
-            ):
+            if ConversationBufferWindowMemory is None:
                 logger.warning("LangChain not installed; conversation memory disabled")
                 self.use_memory = False
                 self.memory = None
             else:
-                if self.max_history > 3:
-                    llm = ChatOpenAI(
-                        model=self.config.openai_model,
-                        api_key=self.config.openai_api_key,
-                    )
-                    buffer_mem = ConversationBufferWindowMemory(
-                        k=self.max_history,
-                        return_messages=True,
-                    )
+                base_mem = ConversationBufferWindowMemory(
+                    k=self.max_history,
+                    return_messages=True,
+                )
+                if (
+                    self.max_history > 3
+                    and CombinedMemory is not None
+                    and ConversationSummaryMemory is not None
+                ):
+                    llm = create_langchain_llm(config_path)
                     summary_mem = ConversationSummaryMemory(
                         llm=llm,
                         return_messages=True,
                     )
-                    self.memory = CombinedMemory(memories=[buffer_mem, summary_mem])
+                    self.memory = CombinedMemory(memories=[base_mem, summary_mem])
                 else:
-                    self.memory = ConversationBufferWindowMemory(
-                        k=self.max_history,
-                        return_messages=True,
-                    )
+                    self.memory = base_mem
         else:
             self.memory = None
         self.session_memory = JiraContextMemory()
@@ -129,6 +125,23 @@ class RouterAgent:
         }
         if intent_tool:
             self.tools["classify_intent"] = intent_tool
+
+        # setup optional LangChain executor for the insight workflow
+        self.insight_executor = None
+        if (
+            self.use_memory
+            and self.memory is not None
+            and initialize_agent is not None
+            and AgentType is not None
+        ):
+            llm = create_langchain_llm(config_path)
+            self.insight_executor = initialize_agent(
+                tools=list(self.tools.values()),
+                llm=llm,
+                agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+                memory=self.memory,
+                handle_parsing_errors=True,
+            )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -321,6 +334,7 @@ class RouterAgent:
     def ask(self, question: str, **kwargs: Any) -> str:
         """Route ``question`` to the appropriate workflow."""
         logger.info("Router received question: %s", question)
+        used_executor = False
 
         if self._pending_confirmation:
             user_reply = question.strip().lower()
@@ -339,31 +353,11 @@ class RouterAgent:
             else:
                 answer = "🚫 Operation cancelled."
             if self.use_memory and self.memory is not None:
-                total = len(self.memory.chat_memory.messages)
-                if total > self.max_history * 2:
-                    try:
-                        self.memory.chat_memory.messages = (
-                            self.memory.chat_memory.messages[-self.max_history :]
-                        )
-                    except Exception:
-                        if hasattr(self.memory, "clear"):
-                            self.memory.clear()
-                self.memory.chat_memory.add_user_message(question)
-                self.memory.chat_memory.add_ai_message(answer)
+                self.memory.save_context({"input": question}, {"output": answer})
             self.session_memory.save_context({"input": question}, {"output": answer})
             return answer
 
-        if self.use_memory and self.memory is not None:
-            total = len(self.memory.chat_memory.messages)
-            if total > self.max_history * 2:
-                try:
-                    self.memory.chat_memory.messages = (
-                        self.memory.chat_memory.messages[-self.max_history :]
-                    )
-                except Exception:
-                    if hasattr(self.memory, "clear"):
-                        self.memory.clear()
-            self.memory.chat_memory.add_user_message(question)
+
 
         issue_id = self._extract_issue_id(question)
         if issue_id:
@@ -397,10 +391,8 @@ class RouterAgent:
                 if not issue_id:
                     answer = "No Jira ticket found in question"
                     if self.use_memory and self.memory is not None:
-                        self.memory.chat_memory.add_ai_message(answer)
-                    self.session_memory.save_context(
-                        {"input": question}, {"output": answer}
-                    )
+                        self.memory.save_context({"input": question}, {"output": answer})
+                    self.session_memory.save_context({"input": question}, {"output": answer})
                     return answer
                 if intent.startswith("VALIDATE"):
                     logger.info("Routing to validation workflow")
@@ -409,7 +401,7 @@ class RouterAgent:
                     if self._pending_confirmation:
                         answer = self._pending_confirmation
                         if self.use_memory and self.memory is not None:
-                            self.memory.chat_memory.add_ai_message(answer)
+                            self.memory.save_context({"input": question}, {"output": answer})
                         self.session_memory.save_context({"input": question}, {"output": answer})
                         return answer
                     if comment_posted:
@@ -419,21 +411,11 @@ class RouterAgent:
                     answer = self._generate_tests(issue_id, question, **kwargs)
                 else:
                     logger.info("Routing to general insights workflow")
-                    include_history = self._needs_history(question, **kwargs)
-                    history_msgs = None
-                    if self.use_memory:
-                        role_map = {"human": "user", "ai": "assistant"}
-                        history_msgs = [
-                            {"role": role_map.get(m.type, m.type), "content": m.content}
-                            for m in self.memory.chat_memory.messages
-                        ]
-                    answer = self.insights.ask(
-                        issue_id,
-                        question,
-                        include_history=include_history,
-                        history=history_msgs,
-                        **kwargs,
-                    )
+                    if self.insight_executor is not None:
+                        answer = self.insight_executor.run(question)
+                        used_executor = True
+                    else:
+                        answer = self.insights.ask(issue_id, question, **kwargs)
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
             answer = (
@@ -458,8 +440,8 @@ class RouterAgent:
         except Exception:
             logger.exception("Unexpected error while processing question")
             answer = "Sorry, something went wrong while handling your request."
-        if self.use_memory and self.memory is not None:
-            self.memory.chat_memory.add_ai_message(answer)
+        if self.use_memory and self.memory is not None and not used_executor:
+            self.memory.save_context({"input": question}, {"output": answer})
         self.session_memory.save_context({"input": question}, {"output": answer})
         return answer
 
