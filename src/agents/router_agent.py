@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, Optional
 
 try:
     from langchain.tools import Tool  # type: ignore
@@ -233,7 +233,9 @@ class RouterAgent:
                 logger.exception("Failed to add validation comment to %s", issue_id)
         return False
 
-    def _generate_test_cases(self, issue_id: str, question: str, **kwargs: Any) -> str:
+    def _generate_test_cases(
+        self, issue_id: str, question: str, **kwargs: Any
+    ) -> Optional[str]:
         """Return test cases string generated from Jira ``issue_id``.
 
         ``None`` is returned when test cases are already present on the issue.
@@ -246,7 +248,7 @@ class RouterAgent:
             description = fields.get("description", "") or ""
             text = f"{summary}\n{description}\n{question}"
             tests = self.tester.create_test_cases(text, None, **kwargs)
-            return tests or ""
+            return tests
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
             return f"Jira issue {issue_id} does not exist or you do not have permission to access it."
@@ -273,6 +275,9 @@ class RouterAgent:
     def _generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
         """Return generated test cases and update Jira when possible."""
         tests = self._generate_test_cases(issue_id, question, **kwargs)
+        if tests is None:
+            return "It looks like this issue already has test cases."
+
         cleaned = normalize_newlines(tests)
         if cleaned and not cleaned.lower().startswith("not enough"):
             if self._add_tests_to_description(issue_id, cleaned):
