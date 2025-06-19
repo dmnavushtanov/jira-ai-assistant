@@ -34,14 +34,7 @@ class IssueCreatorAgent:
         prompt = safe_format(template, {"request": request})
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            text = response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                text = response["choices"][0]["message"]["content"].strip()
-            except Exception:
-                logger.exception("Failed to parse plan response")
-                return {}
+        text = self.client.extract_text(response)
         plan = parse_json_block(text)
         if isinstance(plan, dict):
             return plan

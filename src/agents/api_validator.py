@@ -88,14 +88,7 @@ class ApiValidatorAgent:
         else:
             messages.append({"role": "system", "content": prompt})
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            result = response.choices[0].message.content.strip()
-        except Exception:  # pragma: no cover - handle unexpected structures
-            try:
-                result = response["choices"][0]["message"]["content"].strip()
-            except Exception:
-                logger.exception("Failed to parse response")
-                result = response
+        result = self.client.extract_text(response)
         logger.info("Validation result: %s", result)
         return result
 

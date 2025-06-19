@@ -134,14 +134,10 @@ class JiraOperationsAgent:
         )
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            text = response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                text = response["choices"][0]["message"]["content"].strip()
-            except Exception:
-                logger.exception("Failed to parse transition selection response")
-                return None
+        text = self.client.extract_text(response)
+        if not text:
+            logger.error("Failed to parse transition selection response")
+            return None
 
         if not text or text.upper() == "NONE":
             return None
@@ -245,14 +241,10 @@ class JiraOperationsAgent:
         )
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            text = response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                text = response["choices"][0]["message"]["content"].strip()
-            except Exception:
-                logger.exception("Failed to parse planning response")
-                return {"action": "unknown"}
+        text = self.client.extract_text(response)
+        if not text:
+            logger.error("Failed to parse planning response")
+            return {"action": "unknown"}
         plan = parse_json_block(text)
         if isinstance(plan, dict):
             return plan

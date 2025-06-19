@@ -41,14 +41,7 @@ class PlanningAgent:
         )
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            text = response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                text = response["choices"][0]["message"]["content"].strip()
-            except Exception:
-                logger.exception("Failed to parse planning response")
-                return {"plan": []}
+        text = self.client.extract_text(response)
         plan = parse_json_block(text)
         if isinstance(plan, dict) and isinstance(plan.get("plan"), list):
             logger.debug("Generated plan: %s", plan)

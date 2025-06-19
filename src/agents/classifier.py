@@ -29,14 +29,7 @@ class ClassifierAgent:
         messages: List[Dict[str, str]] = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
         logger.debug("Raw response: %s", response)
-        try:
-            result = response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                result = response["choices"][0]["message"]["content"].strip()
-            except Exception:
-                logger.exception("Failed to parse response")
-                result = response
+        result = self.client.extract_text(response)
         logger.info("Classification result: %s", result)
         return result
 
