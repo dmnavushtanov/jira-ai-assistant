@@ -237,6 +237,11 @@ class JiraOperationsAgent:
             logger.debug("Failed to parse transition_issue response")
             return result_json
 
+    def get_issue_summary(self, issue_id: str, **kwargs: Any) -> str:
+        """Return a short summary for ``issue_id``."""
+        logger.info("Summarizing issue %s", issue_id)
+        return self.insights.summarize(issue_id, **kwargs)
+
     # ------------------------------------------------------------------
     # Natural language operation handling
     # ------------------------------------------------------------------
@@ -325,6 +330,12 @@ class JiraOperationsAgent:
                 if not issue or not transition:
                     return "Missing issue_id or transition for transition_issue"
                 result = self.transition_issue(str(issue), str(transition), **kwargs)
+                return self._format_result(result)
+            if action == "get_issue_summary":
+                issue = plan.get("issue_id") or issue_id
+                if not issue:
+                    return "Missing issue_id for get_issue_summary"
+                result = self.get_issue_summary(str(issue), **kwargs)
                 return self._format_result(result)
         except Exception:
             logger.exception("Failed to execute operation")
