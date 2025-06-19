@@ -64,6 +64,9 @@ class RouterAgent:
         self.planner = PlanningAgent(config_path)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
+        self._pending_confirmation: str | None = None
+        self._confirm_issue: str | None = None
+        self._confirm_comment: str | None = None
         if self.use_memory:
             if None in (
                 ConversationBufferWindowMemory,
@@ -215,13 +218,13 @@ class RouterAgent:
                 )
                 return False
             if self.config.ask_for_confirmation:
-                from src.utils import confirm_action
-
-                if not confirm_action(
-                    f"Should I post the suggested comment to {issue_id}?"
-                ):
-                    logger.info("User declined to add comment to %s", issue_id)
-                    return False
+                self._confirm_issue = issue_id
+                self._confirm_comment = comment
+                self._pending_confirmation = (
+                    f"Post validation comment to {issue_id}? (yes/no)"
+                )
+                logger.info("Awaiting user confirmation to comment on %s", issue_id)
+                return False
             try:
                 self.operations.add_comment(issue_id, comment)
                 logger.info("Posted validation comment to %s", issue_id)
@@ -314,18 +317,47 @@ class RouterAgent:
         """Route ``question`` to the appropriate workflow."""
         logger.info("Router received question: %s", question)
 
+        if self._pending_confirmation:
+            user_reply = question.strip().lower()
+            issue = self._confirm_issue
+            comment = self._confirm_comment
+            self._pending_confirmation = None
+            self._confirm_issue = None
+            self._confirm_comment = None
+            if user_reply in ("y", "yes") and issue and comment:
+                try:
+                    self.operations.add_comment(issue, comment)
+                    answer = "✅ Comment posted."
+                except Exception:
+                    logger.exception("Failed to post confirmation comment")
+                    answer = "Failed to add comment."
+            else:
+                answer = "🚫 Operation cancelled."
+            if self.use_memory and self.memory is not None:
+                total = len(self.memory.chat_memory.messages)
+                if total > self.max_history * 2:
+                    try:
+                        self.memory.chat_memory.messages = (
+                            self.memory.chat_memory.messages[-self.max_history :]
+                        )
+                    except Exception:
+                        if hasattr(self.memory, "clear"):
+                            self.memory.clear()
+                self.memory.chat_memory.add_user_message(question)
+                self.memory.chat_memory.add_ai_message(answer)
+            self.session_memory.save_context({"input": question}, {"output": answer})
+            return answer
+
         if self.use_memory and self.memory is not None:
-            user_count = sum(
-                1 for m in self.memory.chat_memory.messages if m.type == "human"
-            )
-            if user_count >= self.max_history:
-                ans = (
-                    input("max_context_window reached - start new conversation - Y/N: ")
-                    .strip()
-                    .lower()
-                )
-                if ans.startswith("y"):
-                    self.memory.clear()
+            total = len(self.memory.chat_memory.messages)
+            if total > self.max_history * 2:
+                try:
+                    self.memory.chat_memory.messages = (
+                        self.memory.chat_memory.messages[-self.max_history :]
+                    )
+                except Exception:
+                    if hasattr(self.memory, "clear"):
+                        self.memory.clear()
             self.memory.chat_memory.add_user_message(question)
 
         issue_id = self._extract_issue_id(question)
@@ -369,6 +401,12 @@ class RouterAgent:
                     logger.info("Routing to validation workflow")
                     answer = self._classify_and_validate(issue_id, **kwargs)
                     comment_posted = self._handle_validation_result(issue_id, answer)
+                    if self._pending_confirmation:
+                        answer = self._pending_confirmation
+                        if self.use_memory and self.memory is not None:
+                            self.memory.chat_memory.add_ai_message(answer)
+                        self.session_memory.save_context({"input": question}, {"output": answer})
+                        return answer
                     if comment_posted:
                         answer += "\n\nValidation summary posted as a Jira comment."
                 elif intent.startswith("TEST"):
