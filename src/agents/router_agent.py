@@ -25,7 +25,7 @@ except Exception:  # pragma: no cover - optional dependency
     CombinedMemory = None
     ChatOpenAI = None
 
-from src.configs.config import load_config
+from src.agents.base import BaseAgent
 from src.agents.classifier import ClassifierAgent
 from src.agents.issue_insights import IssueInsightsAgent
 from src.agents.api_validator import ApiValidatorAgent
@@ -49,12 +49,12 @@ logger = logging.getLogger(__name__)
 logger.debug("router_agent module loaded")
 
 
-class RouterAgent:
+class RouterAgent(BaseAgent):
     """Agent that routes questions to insights or validation workflows."""
 
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing RouterAgent with config_path=%s", config_path)
-        self.config = load_config(config_path)
+        super().__init__(config_path)
         self.classifier = ClassifierAgent(config_path)
         self.validator = ApiValidatorAgent(config_path)
         self.insights = IssueInsightsAgent(config_path)

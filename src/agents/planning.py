@@ -6,8 +6,7 @@ import json
 import logging
 from typing import Any, Dict
 
-from src.configs.config import load_config
-from src.llm_clients import create_llm_client
+from src.agents.base import BaseAgent
 from src.prompts import load_prompt
 from src.utils import safe_format, parse_json_block
 
@@ -15,13 +14,12 @@ logger = logging.getLogger(__name__)
 logger.debug("planning module loaded")
 
 
-class PlanningAgent:
+class PlanningAgent(BaseAgent):
     """Generate a structured execution plan for Jira operations."""
 
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing PlanningAgent with config_path=%s", config_path)
-        self.config = load_config(config_path)
-        self.client = create_llm_client(config_path)
+        super().__init__(config_path)
         self.plan_prompt = load_prompt("operations_plan.txt")
 
     def generate_plan(

@@ -12,8 +12,8 @@ from typing import Any, Dict, Optional
 import json
 import re
 
-from src.configs.config import load_config
-from src.llm_clients import create_llm_client, create_langchain_llm
+from src.agents.base import BaseAgent
+from src.llm_clients import create_langchain_llm
 from src.prompts import load_prompt
 from src.utils import safe_format
 
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 logger.debug("test_agent module loaded")
 
 
-class TestAgent:
+class TestAgent(BaseAgent):
     """Agent that generates test cases from freeform text.
 
     The text can be a validation summary, the Jira issue description or any
@@ -49,8 +49,7 @@ class TestAgent:
 
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing TestAgent with config_path=%s", config_path)
-        self.config = load_config(config_path)
-        self.client = create_llm_client(config_path)
+        super().__init__(config_path)
         self.prompts = {
             "GET": load_prompt("tests/get_test_cases.txt"),
             "POST": load_prompt("tests/post_test_cases.txt"),

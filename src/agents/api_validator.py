@@ -9,8 +9,7 @@ from pathlib import Path
 
 from src.prompts import load_prompt, PROMPTS_DIR
 from src.utils import extract_plain_text, safe_format
-from src.configs.config import load_config
-from src.llm_clients import create_llm_client
+from src.agents.base import BaseAgent
 
 logger = logging.getLogger(__name__)
 logger.debug("api_validator module loaded")
@@ -34,13 +33,12 @@ def _load_status_prompts(directory: str) -> Dict[str, str]:
 
 
 
-class ApiValidatorAgent:
+class ApiValidatorAgent(BaseAgent):
     """Agent that validates Jira issues based on their status."""
 
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing ApiValidatorAgent with config_path=%s", config_path)
-        self.config = load_config(config_path)
-        self.client = create_llm_client(config_path)
+        super().__init__(config_path)
 
         self.prompts = _load_status_prompts(self.config.validation_prompts_dir)
         self.general_prompt = load_prompt(

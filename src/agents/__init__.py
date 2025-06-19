@@ -8,6 +8,7 @@ logger.info(
     "ClassifierAgent, ApiValidatorAgent and IssueInsightsAgent will be exported"
 )
 
+from .base import BaseAgent
 from .classifier import ClassifierAgent
 from .api_validator import ApiValidatorAgent
 from .issue_insights import IssueInsightsAgent
@@ -18,6 +19,7 @@ from .issue_creator import IssueCreatorAgent
 from .planning import PlanningAgent
 
 __all__ = [
+    "BaseAgent",
     "ClassifierAgent",
     "ApiValidatorAgent",
     "IssueInsightsAgent",

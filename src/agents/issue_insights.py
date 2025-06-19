@@ -7,8 +7,7 @@ import logging
 from typing import Any, Dict
 from datetime import datetime
 
-from src.configs.config import load_config
-from src.llm_clients import create_llm_client
+from src.agents.base import BaseAgent
 from src.prompts import load_prompt
 from src.utils import safe_format
 from src.services.jira_service import (
@@ -22,13 +21,12 @@ logger = logging.getLogger(__name__)
 logger.debug("issue_insights module loaded")
 
 
-class IssueInsightsAgent:
+class IssueInsightsAgent(BaseAgent):
     """Agent that answers general questions about Jira issues."""
 
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing IssueInsightsAgent with config_path=%s", config_path)
-        self.config = load_config(config_path)
-        self.client = create_llm_client(config_path)
+        super().__init__(config_path)
 
         # Tools available to this agent
         self.tools = [get_issue_by_id_tool, get_issue_history_tool]
