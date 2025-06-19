@@ -288,7 +288,7 @@ class RouterAgent:
         """Return generated test cases and update Jira when possible."""
         tests = self._generate_test_cases(issue_id, question, **kwargs)
         if tests is None:
-            return "It looks like this issue already has test cases."
+            return "This issue already has test cases."
 
         cleaned = normalize_newlines(tests)
         if cleaned and not cleaned.lower().startswith("not enough"):
