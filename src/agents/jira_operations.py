@@ -251,6 +251,12 @@ class JiraOperationsAgent:
         logger.debug("Plan not JSON: %s", text)
         return {"action": "unknown"}
 
+    def _format_result(self, result: Any) -> str:
+        """Return ``result`` serialized unless it's already a plain string."""
+        if isinstance(result, str):
+            return result
+        return json.dumps(result)
+
     def operate(self, question: str, issue_id: str | None = None, **kwargs: Any) -> str:
         """Execute an operation described by ``question``."""
         plan = self._plan_operation(question, issue_id=issue_id, **kwargs)
@@ -262,7 +268,7 @@ class JiraOperationsAgent:
                 if not issue or not comment:
                     return "Missing issue_id or comment for add_comment"
                 result = self.add_comment(str(issue), str(comment), **kwargs)
-                return json.dumps(result)
+                return self._format_result(result)
             if action == "create_issue":
                 summary = plan.get("summary")
                 description = plan.get("description")
@@ -277,7 +283,7 @@ class JiraOperationsAgent:
                     str(issue_type),
                     **kwargs,
                 )
-                return json.dumps(result)
+                return self._format_result(result)
             if action == "update_fields":
                 issue = plan.get("issue_id") or issue_id
                 fields = plan.get("fields")
@@ -285,7 +291,7 @@ class JiraOperationsAgent:
                     return "Missing issue_id or fields for update_fields"
                 fields_json = json.dumps(fields)
                 result = self.update_fields(str(issue), fields_json, **kwargs)
-                return json.dumps(result)
+                return self._format_result(result)
             if action == "fill_field_by_label":
                 issue = plan.get("issue_id") or issue_id
                 label = plan.get("field_label")
@@ -295,14 +301,14 @@ class JiraOperationsAgent:
                 result = self.fill_field_by_label(
                     str(issue), str(label), str(value), **kwargs
                 )
-                return json.dumps(result)
+                return self._format_result(result)
             if action == "transition_issue":
                 issue = plan.get("issue_id") or issue_id
                 transition = plan.get("transition")
                 if not issue or not transition:
                     return "Missing issue_id or transition for transition_issue"
                 result = self.transition_issue(str(issue), str(transition), **kwargs)
-                return json.dumps(result)
+                return self._format_result(result)
         except Exception:
             logger.exception("Failed to execute operation")
             return "Error performing Jira operation"
