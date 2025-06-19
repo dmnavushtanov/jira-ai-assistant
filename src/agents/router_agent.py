@@ -189,6 +189,23 @@ class RouterAgent:
         logger.debug("Needs history: %s (label=%s)", result, label)
         return result
 
+    def _check_history_limit(self) -> str | None:
+        """Reset chat history when it grows too large.
+
+        When LangChain memory isn't available the CLI prompt normally asks the
+        user to start a new conversation once ``max_history`` is exceeded. In a
+        non-interactive setting there is no opportunity for user input. This
+        helper automatically clears :class:`JiraContextMemory` and returns a
+        notice to the caller when the limit has been reached.
+        """
+        if self.use_memory or self.session_memory is None:
+            return None
+        if len(self.session_memory.chat_history) >= 2 * self.max_history:
+            logger.info("History limit reached; resetting session memory")
+            self.session_memory.clear()
+            return "Starting a new conversation due to length."
+        return None
+
     def _classify_and_validate(self, issue_id: str, **kwargs: Any) -> str:
         logger.info("Running classification/validation flow for %s", issue_id)
         issue_json = get_issue_by_id_tool.run(issue_id)
@@ -288,9 +305,10 @@ class RouterAgent:
     def _generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
         """Return generated test cases and update Jira when possible."""
         tests = self._generate_test_cases(issue_id, question, **kwargs)
+
         if tests is None or tests == EXISTING_TESTS_MSG:
             return EXISTING_TESTS_MSG
-
+          
         cleaned = normalize_newlines(tests)
         if cleaned and not cleaned.lower().startswith("not enough"):
             if self._add_tests_to_description(issue_id, cleaned):
@@ -301,7 +319,10 @@ class RouterAgent:
         """Execute a multi-step Jira operations plan."""
         issue_key = plan.get("issue_key") or self.session_memory.current_issue
         if not issue_key:
-            return "No Jira issue specified for execution"
+            return (
+                "I'm sorry, I couldn't determine which Jira issue to use. "
+                "Could you specify the issue key?"
+            )
         steps = plan.get("plan") or []
         if not isinstance(steps, list):
             return "Plan did not contain actionable steps"
@@ -335,6 +356,8 @@ class RouterAgent:
         """Route ``question`` to the appropriate workflow."""
         logger.info("Router received question: %s", question)
         used_executor = False
+
+        notice = self._check_history_limit()
 
         if self._pending_confirmation:
             user_reply = question.strip().lower()
@@ -387,7 +410,10 @@ class RouterAgent:
                     answer = self.creator.create_issue(question, project_key, **kwargs)
             else:
                 if not issue_id:
-                    answer = "No Jira ticket found in question"
+                    answer = (
+                        "I'm sorry, I didn't catch an issue key in your question. "
+                        "Could you specify which Jira issue you mean?"
+                    )
                     if self.use_memory and self.memory is not None:
                         self.memory.save_context(
                             {"input": question}, {"output": answer}
@@ -446,6 +472,8 @@ class RouterAgent:
             answer = "Sorry, something went wrong while handling your request."
         if self.use_memory and self.memory is not None and not used_executor:
             self.memory.save_context({"input": question}, {"output": answer})
+        if notice:
+            answer = f"{notice}\n\n{answer}"
         self.session_memory.save_context({"input": question}, {"output": answer})
         return answer
 
