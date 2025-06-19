@@ -52,7 +52,7 @@ class IssueCreatorAgent:
             issue_type_norm = "Sub-task"
         parent = plan.get("parent")
         if issue_type_norm == "Sub-task" and not parent:
-            return "Parent issue key is required for sub-tasks"
+            return "Sure, I can create a sub-task. Which parent issue should it be under?"
         result = self.operations.create_issue(
             summary,
             description,
