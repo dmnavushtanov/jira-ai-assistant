@@ -431,13 +431,25 @@ class RouterAgent:
                     )
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
-            answer = f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
+            answer = (
+                f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
+            )
         except OpenAIError:
             logger.exception("OpenAI API error")
             answer = (
                 "I'm having trouble communicating with the language model right now. "
                 "Please try again later."
             )
+        except RuntimeError as exc:
+            logger.exception("Runtime error while processing question")
+            msg = str(exc)
+            if "validation prompt" in msg.lower():
+                answer = f"Sorry, {msg}"
+            else:
+                answer = msg
+        except ValueError as exc:
+            logger.exception("Value error while processing question")
+            answer = str(exc)
         except Exception:
             logger.exception("Unexpected error while processing question")
             answer = "Sorry, something went wrong while handling your request."
