@@ -32,7 +32,7 @@ from src.agents.classifier import ClassifierAgent
 from src.agents.issue_insights import IssueInsightsAgent
 from src.agents.api_validator import ApiValidatorAgent
 from src.agents.jira_operations import JiraOperationsAgent
-from src.agents.test_agent import TestAgent
+from src.agents.test_agent import TestAgent, EXISTING_TESTS_MSG
 from src.agents.issue_creator import IssueCreatorAgent
 from src.agents.planning import PlanningAgent
 from src.prompts import load_prompt
@@ -247,10 +247,11 @@ class RouterAgent:
 
     def _generate_test_cases(
         self, issue_id: str, question: str, **kwargs: Any
-    ) -> Optional[str]:
+    ) -> str | None:
         """Return test cases string generated from Jira ``issue_id``.
 
-        ``None`` is returned when test cases are already present on the issue.
+        ``None`` or a short message is returned when test cases are already
+        present on the issue.
         """
         try:
             issue_json = get_issue_by_id_tool.run(issue_id)
@@ -287,8 +288,8 @@ class RouterAgent:
     def _generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
         """Return generated test cases and update Jira when possible."""
         tests = self._generate_test_cases(issue_id, question, **kwargs)
-        if tests is None:
-            return "It looks like this issue already has test cases."
+        if tests is None or tests == EXISTING_TESTS_MSG:
+            return EXISTING_TESTS_MSG
 
         cleaned = normalize_newlines(tests)
         if cleaned and not cleaned.lower().startswith("not enough"):
@@ -356,8 +357,6 @@ class RouterAgent:
             self.session_memory.save_context({"input": question}, {"output": answer})
             return answer
 
-
-
         issue_id = self._extract_issue_id(question)
         if issue_id:
             self.session_memory.current_issue = issue_id
@@ -390,8 +389,12 @@ class RouterAgent:
                 if not issue_id:
                     answer = "No Jira ticket found in question"
                     if self.use_memory and self.memory is not None:
-                        self.memory.save_context({"input": question}, {"output": answer})
-                    self.session_memory.save_context({"input": question}, {"output": answer})
+                        self.memory.save_context(
+                            {"input": question}, {"output": answer}
+                        )
+                    self.session_memory.save_context(
+                        {"input": question}, {"output": answer}
+                    )
                     return answer
                 if intent.startswith("VALIDATE"):
                     logger.info("Routing to validation workflow")
@@ -400,8 +403,12 @@ class RouterAgent:
                     if self._pending_confirmation:
                         answer = self._pending_confirmation
                         if self.use_memory and self.memory is not None:
-                            self.memory.save_context({"input": question}, {"output": answer})
-                        self.session_memory.save_context({"input": question}, {"output": answer})
+                            self.memory.save_context(
+                                {"input": question}, {"output": answer}
+                            )
+                        self.session_memory.save_context(
+                            {"input": question}, {"output": answer}
+                        )
                         return answer
                     if comment_posted:
                         answer += "\n\nValidation summary posted as a Jira comment."
@@ -417,9 +424,7 @@ class RouterAgent:
                         answer = self.insights.ask(issue_id, question, **kwargs)
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
-            answer = (
-                f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
-            )
+            answer = f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
         except OpenAIError:
             logger.exception("OpenAI API error")
             answer = (

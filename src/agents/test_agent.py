@@ -40,6 +40,12 @@ logger = logging.getLogger(__name__)
 logger.debug("test_agent module loaded")
 
 
+EXISTING_TESTS_MSG = (
+    "It looks like there are already test cases in the issue description, "
+    "so I didn't generate new ones."
+)
+
+
 class TestAgent:
     """Agent that generates test cases from freeform text.
 
@@ -141,13 +147,13 @@ class TestAgent:
 
     def create_test_cases(
         self, text: str, method: Optional[str] = None, **kwargs: Any
-    ) -> Optional[str]:
-        """Return generated test cases or ``None`` if tests already exist.
+    ) -> str:
+        """Return generated test cases or a message when they already exist.
 
         The LLM checks the provided ``text`` for existing test cases. If they
-        are present it responds with ``HAS_TESTS`` and this method returns
-        ``None``. Otherwise the response contains the new tests which are
-        returned as-is.
+        are present it responds with ``HAS_TESTS`` and this method returns a
+        short explanatory message. Otherwise the response contains the new
+        tests which are returned as-is.
         """
 
         if None not in (
@@ -160,11 +166,10 @@ class TestAgent:
         ):
             logger.info("Running planning pipeline for test generation")
             result = self.plan_and_generate(text, text, **kwargs)
-            return (
-                result
-                if result and not result.upper().startswith("HAS_TESTS")
-                else None
-            )
+            if result and not str(result).upper().startswith("HAS_TESTS"):
+                return str(result)
+            logger.info("Existing tests detected during planning")
+            return EXISTING_TESTS_MSG
 
         method = (method or self._extract_method(text) or "GET").upper()
         template = self.prompts.get(method) or self.default_prompt
@@ -177,7 +182,8 @@ class TestAgent:
         result = self.client.extract_text(response)
         logger.debug("Generated test cases: %s", result)
         if result.upper().startswith("HAS_TESTS"):
-            return None
+            logger.info("Existing tests detected")
+            return EXISTING_TESTS_MSG
         return result
 
     # ------------------------------------------------------------------
@@ -252,4 +258,4 @@ class TestAgent:
         return str(result)
 
 
-__all__ = ["TestAgent"]
+__all__ = ["TestAgent", "EXISTING_TESTS_MSG"]
