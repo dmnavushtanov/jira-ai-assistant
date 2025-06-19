@@ -300,7 +300,10 @@ class RouterAgent:
         """Execute a multi-step Jira operations plan."""
         issue_key = plan.get("issue_key") or self.session_memory.current_issue
         if not issue_key:
-            return "No Jira issue specified for execution"
+            return (
+                "I'm sorry, I couldn't determine which Jira issue to use. "
+                "Could you specify the issue key?"
+            )
         steps = plan.get("plan") or []
         if not isinstance(steps, list):
             return "Plan did not contain actionable steps"
@@ -388,7 +391,10 @@ class RouterAgent:
                     answer = self.creator.create_issue(question, project_key, **kwargs)
             else:
                 if not issue_id:
-                    answer = "No Jira ticket found in question"
+                    answer = (
+                        "I'm sorry, I didn't catch an issue key in your question. "
+                        "Could you specify which Jira issue you mean?"
+                    )
                     if self.use_memory and self.memory is not None:
                         self.memory.save_context({"input": question}, {"output": answer})
                     self.session_memory.save_context({"input": question}, {"output": answer})
