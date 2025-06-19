@@ -14,6 +14,7 @@ from src.services.jira_service import (
     update_issue_fields_tool,
     transition_issue_tool,
 )
+from src.agents.issue_insights import IssueInsightsAgent
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
@@ -32,6 +33,7 @@ class JiraOperationsAgent:
         )
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
+        self.insights = IssueInsightsAgent(config_path)
 
         # Tools available to this agent
         self.tools = [
@@ -226,6 +228,11 @@ class JiraOperationsAgent:
             logger.debug("Failed to parse transition_issue response")
             return result_json
 
+    def get_issue_summary(self, issue_id: str, **kwargs: Any) -> str:
+        """Return a short summary for ``issue_id``."""
+        logger.info("Summarizing issue %s", issue_id)
+        return self.insights.summarize(issue_id, **kwargs)
+
     # ------------------------------------------------------------------
     # Natural language operation handling
     # ------------------------------------------------------------------
@@ -308,6 +315,12 @@ class JiraOperationsAgent:
                 if not issue or not transition:
                     return "Missing issue_id or transition for transition_issue"
                 result = self.transition_issue(str(issue), str(transition), **kwargs)
+                return self._format_result(result)
+            if action == "get_issue_summary":
+                issue = plan.get("issue_id") or issue_id
+                if not issue:
+                    return "Missing issue_id for get_issue_summary"
+                result = self.get_issue_summary(str(issue), **kwargs)
                 return self._format_result(result)
         except Exception:
             logger.exception("Failed to execute operation")
