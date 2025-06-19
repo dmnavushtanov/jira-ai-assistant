@@ -17,5 +17,5 @@ strip_unused_jira_data: true
 follow_related_jiras: true
 validation_prompts_dir: validation
 write_comments_to_jira: true
-ask_for_confirmation: false
+ask_for_confirmation: true
 log_jira_payloads: false
