@@ -1,30 +1,25 @@
-import json
 import logging
 from typing import Any, Optional
+
+from langchain.output_parsers import JsonOutputParser
 
 logger = logging.getLogger(__name__)
 
 
 def parse_json_block(text: str) -> Optional[Any]:
-    """Return parsed JSON from ``text`` which may include markdown fences."""
+    """Return parsed JSON from ``text`` using ``JsonOutputParser``.
+
+    The LangChain parser handles code fences and minor formatting issues
+    so custom regex extraction is no longer required.
+    """
     if not isinstance(text, str):
         return None
 
     cleaned = text.strip()
-    if cleaned.startswith("```") and cleaned.endswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.lower().startswith("json"):
-            cleaned = cleaned[4:].strip()
+
+    parser = JsonOutputParser()
     try:
-        return json.loads(cleaned)
+        return parser.parse(cleaned)
     except Exception:
-        pass
-    start = cleaned.find('{')
-    end = cleaned.rfind('}')
-    if start != -1 and end != -1 and end > start:
-        candidate = cleaned[start:end + 1]
-        try:
-            return json.loads(candidate)
-        except Exception:
-            logger.debug("Failed to parse JSON block", exc_info=True)
+        logger.debug("JsonOutputParser failed", exc_info=True)
     return None
