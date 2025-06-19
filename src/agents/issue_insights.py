@@ -70,14 +70,7 @@ class IssueInsightsAgent:
         )
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            return response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                return response["choices"][0]["message"]["content"].strip()
-            except Exception:  # pragma: no cover
-                logger.exception("Failed to parse summary response")
-                return str(response)
+        return self.client.extract_text(response)
 
     # ------------------------------------------------------------------
     # Public API
@@ -115,14 +108,7 @@ class IssueInsightsAgent:
         }
         messages = [system_msg] + (history or []) + [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            return response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                return response["choices"][0]["message"]["content"].strip()
-            except Exception:  # pragma: no cover
-                logger.exception("Failed to parse response")
-                return str(response)
+        return self.client.extract_text(response)
 
     def summarize(self, issue_id: str, **kwargs: Any) -> str:
         """Return a short summary for ``issue_id``."""

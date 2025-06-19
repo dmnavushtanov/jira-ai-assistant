@@ -174,14 +174,7 @@ class TestAgent:
         logger.info("Generating test cases from provided text")
         messages = [{"role": "user", "content": prompt}]
         response = self.client.chat_completion(messages, **kwargs)
-        try:
-            result = response.choices[0].message.content.strip()
-        except Exception:
-            try:
-                result = response["choices"][0]["message"]["content"].strip()
-            except Exception:  # pragma: no cover - handle unexpected structure
-                logger.exception("Failed to parse response")
-                result = str(response)
+        result = self.client.extract_text(response)
         logger.debug("Generated test cases: %s", result)
         if result.upper().startswith("HAS_TESTS"):
             return None

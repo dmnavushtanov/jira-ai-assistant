@@ -19,7 +19,7 @@ class OpenAIService:
         logger.debug("Asking question: %s", question)
         messages: List[Dict[str, str]] = [{"role": "user", "content": question}]
         response = self.client.chat_completion(messages, **kwargs)
-        answer = response.choices[0].message.content.strip()
+        answer = self.client.extract_text(response)
         logger.info("Received response from OpenAI")
         return answer
 
