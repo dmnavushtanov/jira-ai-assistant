@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Optional
 
-from langchain.output_parsers import JsonOutputParser
+from langchain_core.output_parsers import JsonOutputParser
 
 logger = logging.getLogger(__name__)
 
