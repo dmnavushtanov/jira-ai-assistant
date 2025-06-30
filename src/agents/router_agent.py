@@ -253,8 +253,8 @@ class RouterAgent:
         if not (self.use_memory and self.memory is not None):
             return False
         try:
-            _ = self.memory.chat_memory.messages[-1]
-            return True
+            messages = getattr(self.memory.chat_memory, "messages", [])
+            return bool(messages)
         except Exception:
             logger.exception("Failed to access primary memory")
             return False
