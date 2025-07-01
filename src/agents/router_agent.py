@@ -12,6 +12,7 @@ try:
     from langchain.tools import Tool, BaseTool  # type: ignore
     from langchain.memory import ConversationBufferWindowMemory
     from langchain.prompts import PromptTemplate
+
 except Exception:  # pragma: no cover - optional dependency
     AgentExecutor = None
     BaseTool = None
@@ -20,18 +21,18 @@ except Exception:  # pragma: no cover - optional dependency
     PromptTemplate = None
 
 
-from src.configs.config import load_config
-from src.llm_clients import create_langchain_llm
-from src.agents.classifier import ClassifierAgent
-from src.agents.issue_insights import IssueInsightsAgent
-from src.agents.api_validator import ApiValidatorAgent
-from src.agents.jira_operations import JiraOperationsAgent
-from src.agents.test_agent import TestAgent, EXISTING_TESTS_MSG
-from src.agents.issue_creator import IssueCreatorAgent
-from src.agents.planning import PlanningAgent
-from src.prompts import load_prompt
-from src.services.jira_service import get_issue_by_id_tool
-from src.utils import (
+from ..configs.config import load_config
+from ..llm_clients import create_langchain_llm
+from .classifier import ClassifierAgent
+from .issue_insights import IssueInsightsAgent
+from .api_validator import ApiValidatorAgent
+from .jira_operations import JiraOperationsAgent
+from .test_agent import TestAgent, EXISTING_TESTS_MSG
+from .issue_creator import IssueCreatorAgent
+from .planning import PlanningAgent
+from ..prompts import load_prompt
+from ..services.jira_service import get_issue_by_id_tool
+from ..utils import (
     safe_format,
     JiraContextMemory,
     parse_json_block,
@@ -535,152 +536,6 @@ class RouterAgent:
         return "\n".join(results)
 
     # ------------------------------------------------------------------
-    # Tooling
-    # ------------------------------------------------------------------
-    def _create_tools(self) -> list[Any]:
-        """Create LangChain tools for the agent."""
-        if Tool is None:
-            return []
-        tools = [
-            Tool(
-                name="GetContext",
-                func=lambda _: self.prepare_conversation_history(),
-                description="Get recent conversation context for use in other tools.",
-            ),
-            Tool(
-                name="AskInsight",
-                func=self._tool_insight,
-                description="Answer questions about an issue. Input 'issue:KEY|question:TEXT'",
-            ),
-            Tool(
-                name="ValidateIssue",
-                func=self._tool_validate,
-                description="Validate an API on an issue. Input 'issue:KEY|question:TEXT'",
-            ),
-            Tool(
-                name="JiraOperate",
-                func=self._tool_operate,
-                description="Perform operations on Jira issues. Input 'issue:KEY|question:TEXT'",
-            ),
-            Tool(
-                name="GenerateTests",
-                func=self._tool_generate_tests,
-                description="Generate test cases. Input 'issue:KEY|question:TEXT'",
-            ),
-            Tool(
-                name="CreateIssue",
-                func=self._tool_create_issue,
-                description="Create a new issue. Input 'project:KEY|request:TEXT'",
-            ),
-            Tool(
-                name="ClassifyIntent",
-                func=self._tool_classify_intent,
-                description="Classify user intent. Input 'question:TEXT'",
-            ),
-        ]
-        return tools
-
-    def _create_agent_executor(self) -> Optional[Any]:
-        """Create modern LangChain agent executor if possible."""
-        if None in (create_react_agent, AgentExecutor, PromptTemplate):
-            return None
-        llm = create_langchain_llm(None)
-        if llm is None:
-            return None
-        prompt = PromptTemplate.from_template(
-            """
-You are a helpful Jira assistant. Use the provided tools to answer the user.
-
-Available tools: {tools}
-Tool names: {tool_names}
-
-Question: {input}
-{agent_scratchpad}
-"""
-        )
-        agent = create_react_agent(llm=llm, tools=self.langchain_tools, prompt=prompt)
-        return AgentExecutor(
-            agent=agent,
-            tools=self.langchain_tools,
-            memory=self.memory,
-            verbose=True,
-            max_iterations=5,
-            handle_parsing_errors=True,
-        )
-
-    # Tool handlers ------------------------------------------------------
-    def _tool_insight(self, input_str: str) -> str:
-        params = self._parse_tool_input(input_str)
-        issue = params.get("issue") or params.get("issue_id")
-        question = params.get("question", "")
-        if not issue:
-            return "Error: missing issue"
-        try:
-            history = self.prepare_conversation_history()
-            return self.insights.ask(issue, question, history=history)
-        except Exception as exc:
-            logger.exception("Insight tool failed")
-            return f"Error: {exc}"
-
-    def _tool_validate(self, input_str: str) -> str:
-        params = self._parse_tool_input(input_str)
-        issue = params.get("issue")
-        question = params.get("question", "")
-        if not issue:
-            return "Error: missing issue"
-        try:
-            history = self.prepare_conversation_history()
-            result = self._classify_and_validate(issue, history=history)
-            self._handle_validation_result(issue, result)
-            return result
-        except Exception as exc:
-            logger.exception("Validation tool failed")
-            return f"Error: {exc}"
-
-    def _tool_operate(self, input_str: str) -> str:
-        params = self._parse_tool_input(input_str)
-        issue = params.get("issue")
-        question = params.get("question", "")
-        try:
-            history = self.prepare_conversation_history()
-            return self.operations.operate(question, issue_id=issue, history=history)
-        except Exception as exc:
-            logger.exception("Operations tool failed")
-            return f"Error: {exc}"
-
-    def _tool_generate_tests(self, input_str: str) -> str:
-        params = self._parse_tool_input(input_str)
-        issue = params.get("issue")
-        question = params.get("question", "")
-        if not issue:
-            return "Error: missing issue"
-        try:
-            history = self.prepare_conversation_history()
-            return self._generate_tests(issue, question, history=history)
-        except Exception as exc:
-            logger.exception("Generate tests tool failed")
-            return f"Error: {exc}"
-
-    def _tool_create_issue(self, input_str: str) -> str:
-        params = self._parse_tool_input(input_str)
-        project = params.get("project")
-        request = params.get("request", "")
-        if not project:
-            return "Error: missing project"
-        try:
-            history = self.prepare_conversation_history()
-            return self.creator.create_issue(request, project, history=history)
-        except Exception as exc:
-            logger.exception("Create issue tool failed")
-            return f"Error: {exc}"
-
-    def _tool_classify_intent(self, input_str: str) -> str:
-        params = self._parse_tool_input(input_str)
-        question = params.get("question", "")
-        intent, score = self._classify_intent_with_score(question)
-        return json.dumps({"intent": intent, "confidence": score})
-
-    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def ask(self, question: str, **kwargs: Any) -> str:
@@ -702,7 +557,10 @@ Question: {input}
                     f"Current context: {context}\n\nQuestion: {question}"
                 )
                 result = self.agent_executor.invoke({"input": enhanced_question})
-                answer = result.get("output", "I couldn't process your request.")
+                if result:
+                    answer = result.get("output", "I couldn't process your request.")
+                else:
+                    answer = "I couldn't process your request."
             except Exception as exc:
                 logger.exception("Error in agent executor")
                 answer = f"I encountered an error processing your request: {exc}"
