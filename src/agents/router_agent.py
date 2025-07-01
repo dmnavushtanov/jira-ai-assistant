@@ -19,6 +19,7 @@ except Exception:  # pragma: no cover - optional dependency
     ConversationBufferWindowMemory = None
     PromptTemplate = None
 
+
 from src.configs.config import load_config
 from src.llm_clients import create_langchain_llm
 from src.agents.classifier import ClassifierAgent
@@ -79,7 +80,6 @@ class RouterAgent:
         self.issue_re = re.compile(rf"(?:{pattern})-\d+", re.IGNORECASE)
         self.history_prompt = load_prompt("needs_history.txt")
         self.intent_prompt = load_prompt("intent_classifier.txt")
-
         self.llm = None
         self.tools: List[BaseTool] = []
         self.agent_executor: AgentExecutor | None = None
@@ -115,6 +115,15 @@ class RouterAgent:
         logger.warning("No project key found in text: %s", text)
         return None
 
+    def _parse_tool_input(self, input_str: str) -> dict[str, str]:
+        """Return dict parsed from ``input_str`` formatted as 'key:value|key:value'."""
+        result: dict[str, str] = {}
+        for part in str(input_str).split("|"):
+            if ":" in part:
+                key, value = part.split(":", 1)
+                result[key.strip()] = value.strip()
+        return result
+
     def _classify_intent(self, question: str, **kwargs: Any) -> str:
         """Return the intent label for ``question`` using the classifier agent."""
         if not self.intent_prompt:
@@ -124,7 +133,6 @@ class RouterAgent:
         result = str(label).strip().upper()
         logger.debug("Intent classification result: %s", result)
         return result
-
     def _should_validate(self, question: str, **kwargs: Any) -> bool:
         """Return ``True`` if the detected intent is VALIDATE."""
         return self._classify_intent(question, **kwargs).startswith("VALIDATE")
@@ -421,6 +429,18 @@ class RouterAgent:
                 logger.exception("Failed to add validation comment to %s", issue_id)
         return False
 
+    def _request_confirmation(self, issue_id: str, comment: str) -> None:
+        """Store state for posting confirmation comment."""
+        self._confirm_issue = issue_id
+        self._confirm_comment = comment
+        self._pending_confirmation = f"Post validation comment to {issue_id}? (yes/no)"
+        logger.info("Awaiting user confirmation to comment on %s", issue_id)
+
+    def _reset_confirmation(self) -> None:
+        self._pending_confirmation = None
+        self._confirm_issue = None
+        self._confirm_comment = None
+
     def _generate_test_cases(
         self, issue_id: str, question: str, **kwargs: Any
     ) -> str | None:
@@ -513,6 +533,152 @@ class RouterAgent:
                 logger.exception("Failed step %s", action)
                 results.append(f"Failed {action}: {exc}")
         return "\n".join(results)
+
+    # ------------------------------------------------------------------
+    # Tooling
+    # ------------------------------------------------------------------
+    def _create_tools(self) -> list[Any]:
+        """Create LangChain tools for the agent."""
+        if Tool is None:
+            return []
+        tools = [
+            Tool(
+                name="GetContext",
+                func=lambda _: self.prepare_conversation_history(),
+                description="Get recent conversation context for use in other tools.",
+            ),
+            Tool(
+                name="AskInsight",
+                func=self._tool_insight,
+                description="Answer questions about an issue. Input 'issue:KEY|question:TEXT'",
+            ),
+            Tool(
+                name="ValidateIssue",
+                func=self._tool_validate,
+                description="Validate an API on an issue. Input 'issue:KEY|question:TEXT'",
+            ),
+            Tool(
+                name="JiraOperate",
+                func=self._tool_operate,
+                description="Perform operations on Jira issues. Input 'issue:KEY|question:TEXT'",
+            ),
+            Tool(
+                name="GenerateTests",
+                func=self._tool_generate_tests,
+                description="Generate test cases. Input 'issue:KEY|question:TEXT'",
+            ),
+            Tool(
+                name="CreateIssue",
+                func=self._tool_create_issue,
+                description="Create a new issue. Input 'project:KEY|request:TEXT'",
+            ),
+            Tool(
+                name="ClassifyIntent",
+                func=self._tool_classify_intent,
+                description="Classify user intent. Input 'question:TEXT'",
+            ),
+        ]
+        return tools
+
+    def _create_agent_executor(self) -> Optional[Any]:
+        """Create modern LangChain agent executor if possible."""
+        if None in (create_react_agent, AgentExecutor, PromptTemplate):
+            return None
+        llm = create_langchain_llm(None)
+        if llm is None:
+            return None
+        prompt = PromptTemplate.from_template(
+            """
+You are a helpful Jira assistant. Use the provided tools to answer the user.
+
+Available tools: {tools}
+Tool names: {tool_names}
+
+Question: {input}
+{agent_scratchpad}
+"""
+        )
+        agent = create_react_agent(llm=llm, tools=self.langchain_tools, prompt=prompt)
+        return AgentExecutor(
+            agent=agent,
+            tools=self.langchain_tools,
+            memory=self.memory,
+            verbose=True,
+            max_iterations=5,
+            handle_parsing_errors=True,
+        )
+
+    # Tool handlers ------------------------------------------------------
+    def _tool_insight(self, input_str: str) -> str:
+        params = self._parse_tool_input(input_str)
+        issue = params.get("issue") or params.get("issue_id")
+        question = params.get("question", "")
+        if not issue:
+            return "Error: missing issue"
+        try:
+            history = self.prepare_conversation_history()
+            return self.insights.ask(issue, question, history=history)
+        except Exception as exc:
+            logger.exception("Insight tool failed")
+            return f"Error: {exc}"
+
+    def _tool_validate(self, input_str: str) -> str:
+        params = self._parse_tool_input(input_str)
+        issue = params.get("issue")
+        question = params.get("question", "")
+        if not issue:
+            return "Error: missing issue"
+        try:
+            history = self.prepare_conversation_history()
+            result = self._classify_and_validate(issue, history=history)
+            self._handle_validation_result(issue, result)
+            return result
+        except Exception as exc:
+            logger.exception("Validation tool failed")
+            return f"Error: {exc}"
+
+    def _tool_operate(self, input_str: str) -> str:
+        params = self._parse_tool_input(input_str)
+        issue = params.get("issue")
+        question = params.get("question", "")
+        try:
+            history = self.prepare_conversation_history()
+            return self.operations.operate(question, issue_id=issue, history=history)
+        except Exception as exc:
+            logger.exception("Operations tool failed")
+            return f"Error: {exc}"
+
+    def _tool_generate_tests(self, input_str: str) -> str:
+        params = self._parse_tool_input(input_str)
+        issue = params.get("issue")
+        question = params.get("question", "")
+        if not issue:
+            return "Error: missing issue"
+        try:
+            history = self.prepare_conversation_history()
+            return self._generate_tests(issue, question, history=history)
+        except Exception as exc:
+            logger.exception("Generate tests tool failed")
+            return f"Error: {exc}"
+
+    def _tool_create_issue(self, input_str: str) -> str:
+        params = self._parse_tool_input(input_str)
+        project = params.get("project")
+        request = params.get("request", "")
+        if not project:
+            return "Error: missing project"
+        try:
+            history = self.prepare_conversation_history()
+            return self.creator.create_issue(request, project, history=history)
+        except Exception as exc:
+            logger.exception("Create issue tool failed")
+            return f"Error: {exc}"
+
+    def _tool_classify_intent(self, input_str: str) -> str:
+        params = self._parse_tool_input(input_str)
+        question = params.get("question", "")
+        intent, score = self._classify_intent_with_score(question)
+        return json.dumps({"intent": intent, "confidence": score})
 
     # ------------------------------------------------------------------
     # Public API
