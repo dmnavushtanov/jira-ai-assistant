@@ -5,26 +5,19 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 try:
-    from langchain.tools import Tool  # type: ignore
+    from langchain.agents import AgentExecutor, create_react_agent
+    from langchain.tools import Tool, BaseTool  # type: ignore
+    from langchain.memory import ConversationBufferWindowMemory
+    from langchain.prompts import PromptTemplate
 except Exception:  # pragma: no cover - optional dependency
+    AgentExecutor = None
+    BaseTool = None
     Tool = None
-
-try:
-    from langchain.memory import (
-        ConversationBufferWindowMemory,
-        ConversationSummaryMemory,
-        CombinedMemory,
-    )
-    from langchain.agents import initialize_agent, AgentType  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
     ConversationBufferWindowMemory = None
-    ConversationSummaryMemory = None
-    CombinedMemory = None
-    initialize_agent = None  # type: ignore
-    AgentType = None  # type: ignore
+    PromptTemplate = None
 
 from src.configs.config import load_config
 from src.llm_clients import create_langchain_llm
@@ -65,36 +58,18 @@ class RouterAgent:
         self.creator = IssueCreatorAgent(config_path)
         self.planner = PlanningAgent(config_path)
         self.use_memory = self.config.conversation_memory
-        # global conversation context is enabled when memory is enabled
-        self.global_memory_enabled = self.use_memory
         self.max_history = self.config.max_questions_to_remember
-        self._pending_confirmation: str | None = None
-        self._confirm_issue: str | None = None
-        self._confirm_comment: str | None = None
-        if self.use_memory:
-            if ConversationBufferWindowMemory is None:
-                logger.warning("LangChain not installed; conversation memory disabled")
-                self.use_memory = False
-                self.memory = None
-            else:
-                base_mem = ConversationBufferWindowMemory(
-                    k=self.max_history,
-                    return_messages=True,
-                )
-                if (
-                    self.max_history > 3
-                    and CombinedMemory is not None
-                    and ConversationSummaryMemory is not None
-                ):
-                    llm = create_langchain_llm(config_path)
-                    summary_mem = ConversationSummaryMemory(
-                        llm=llm,
-                        return_messages=True,
-                    )
-                    self.memory = CombinedMemory(memories=[base_mem, summary_mem])
-                else:
-                    self.memory = base_mem
+
+        if self.use_memory and ConversationBufferWindowMemory is not None:
+            self.memory = ConversationBufferWindowMemory(
+                k=self.max_history,
+                return_messages=True,
+                memory_key="chat_history",
+            )
         else:
+            if self.use_memory:
+                logger.warning("LangChain not installed; conversation memory disabled")
+            self.use_memory = False
             self.memory = None
         self.session_memory = JiraContextMemory()
         if self.config.projects:
@@ -105,44 +80,17 @@ class RouterAgent:
         self.history_prompt = load_prompt("needs_history.txt")
         self.intent_prompt = load_prompt("intent_classifier.txt")
 
-        # expose helper agents for external orchestration
-        intent_tool = None
-        if Tool is not None:
-            intent_tool = Tool(
-                name="classify_intent",
-                func=self._classify_intent,
-                description=(
-                    "Classify user intent as VALIDATE, OPERATE, INSIGHT, TEST, CREATE, or UNKNOWN"
-                ),
-            )
+        self.llm = None
+        self.tools: List[BaseTool] = []
+        self.agent_executor: AgentExecutor | None = None
 
-        self.tools = {
-            "classifier": self.classifier,
-            "validator": self.validator,
-            "insights": self.insights,
-            "operations": self.operations,
-            "tester": self.tester,
-            "creator": self.creator,
-        }
-        if intent_tool:
-            self.tools["classify_intent"] = intent_tool
-
-        # setup optional LangChain executor for the insight workflow
-        self.insight_executor = None
-        if (
-            self.use_memory
-            and self.memory is not None
-            and initialize_agent is not None
-            and AgentType is not None
-        ):
-            llm = create_langchain_llm(config_path)
-            self.insight_executor = initialize_agent(
-                tools=list(self.tools.values()),
-                llm=llm,
-                agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-                memory=self.memory,
-                handle_parsing_errors=True,
-            )
+        if AgentExecutor is not None and Tool is not None and PromptTemplate is not None:
+            self.llm = create_langchain_llm(config_path)
+            self.tools = self._create_tools()
+            if self.use_memory:
+                self.agent_executor = self._create_agent_executor()
+        else:
+            logger.warning("LangChain not installed; advanced routing disabled")
 
     # ------------------------------------------------------------------
     # Helpers
@@ -172,26 +120,6 @@ class RouterAgent:
         if not self.intent_prompt:
             raise RuntimeError("Intent classification prompt not found")
         prompt = safe_format(self.intent_prompt, {"question": question})
-        label = self.classifier.classify(prompt, **kwargs)
-        result = str(label).strip().upper()
-        logger.debug("Intent classification result: %s", result)
-        return result
-
-    def _classify_intent_with_context(self, question: str, **kwargs: Any) -> str:
-        """Classify intent with conversation history for better context."""
-        if not self.intent_prompt:
-            raise RuntimeError("Intent classification prompt not found")
-
-        if len(question.strip().split()) <= self.max_history:
-            history = self.prepare_conversation_history(limit=self.max_history)
-            if history:
-                enhanced_question = f"Conversation context:\n{history}\n\nCurrent input: {question}"
-                prompt = safe_format(self.intent_prompt, {"question": enhanced_question})
-            else:
-                prompt = safe_format(self.intent_prompt, {"question": question})
-        else:
-            prompt = safe_format(self.intent_prompt, {"question": question})
-
         label = self.classifier.classify(prompt, **kwargs)
         result = str(label).strip().upper()
         logger.debug("Intent classification result: %s", result)
@@ -228,79 +156,245 @@ class RouterAgent:
             return "Starting a new conversation due to length."
         return None
 
-    def prepare_conversation_history(self, limit: int | None = None) -> str:
-        """Return recent conversation history for context injection."""
-        if not self.global_memory_enabled:
-            return ""
+    # ------------------------------------------------------------------
+    # Tooling helpers
+    # ------------------------------------------------------------------
+    def _parse_tool_input(self, input_str: str) -> Dict[str, str]:
+        """Parse tool input in format 'key:value|key:value'."""
+        parts: Dict[str, str] = {}
+        for part in input_str.split("|"):
+            if ":" in part:
+                key, value = part.split(":", 1)
+                parts[key.strip()] = value.strip()
+        return parts
 
-        limit = limit or self.max_history
-
-        if self._try_primary_memory(limit):
-            return self._format_memory_messages(limit)
-
-        if self._try_session_memory(limit):
-            return self._format_session_history(limit)
-
-        return ""
-
-    def _try_primary_memory(self, limit: int) -> bool:
-        if not (self.use_memory and self.memory is not None):
-            return False
-        try:
-            _ = self.memory.chat_memory.messages[-1]
-            return True
-        except Exception:
-            logger.exception("Failed to access primary memory")
-            return False
-
-    def _try_session_memory(self, limit: int) -> bool:
-        if not (self.session_memory and hasattr(self.session_memory, "chat_history")):
-            return False
-        return bool(self.session_memory.chat_history)
-
-    def _format_memory_messages(self, limit: int) -> str:
-        try:
-            messages = self.memory.chat_memory.messages[-limit:]
-        except Exception:
-            logger.exception("Failed to read conversation memory")
-            return ""
-        return "\n".join(
-            f"{'User' if msg.type == 'human' else 'Assistant'}: {msg.content}"
-            for msg in messages
+    def _create_tools(self) -> List[BaseTool]:
+        if Tool is None:
+            return []
+        tools: List[BaseTool] = []
+        tools.append(
+            Tool(
+                name="get_issue_insights",
+                func=self._handle_insights,
+                description=(
+                    "Get details and analysis about a Jira issue when the user asks for information. "
+                    "Use only when explicitly asked for issue details, status, or insights. "
+                    "Input: 'issue_id:PROJ-123|question:What is the status?'"
+                ),
+            )
         )
 
-    def _format_session_history(self, limit: int) -> str:
-        try:
-            recent = self.session_memory.chat_history[-limit:]
-        except Exception:
-            logger.exception("Failed to read session history")
-            return ""
-        history_parts = []
-        for i, content in enumerate(recent):
-            role = "User" if i % 2 == 0 else "Assistant"
-            history_parts.append(f"{role}: {content}")
-        return "\n".join(history_parts)
+        tools.append(
+            Tool(
+                name="validate_api_issue",
+                func=self._handle_validation,
+                description=(
+                    "Validate API-related Jira issues ONLY when explicitly requested by the user. "
+                    "Do not use this tool unless the user specifically asks for validation. "
+                    "Input: 'issue_id:PROJ-123'"
+                ),
+            )
+        )
 
-    def _classify_and_validate(self, issue_id: str, history: str = "", **kwargs: Any) -> str:
+        tools.append(
+            Tool(
+                name="perform_jira_operation",
+                func=self._handle_operations,
+                description=(
+                    "Perform operations on Jira issues such as adding comments, updating fields, or transitioning status. "
+                    "Use this tool for action requests like 'add comment', 'update field', 'transition to status'. "
+                    "Input: 'issue_id:PROJ-123|question:add comment \"nice jira\"'"
+                ),
+            )
+        )
+
+        tools.append(
+            Tool(
+                name="generate_test_cases",
+                func=self._handle_test_generation,
+                description=(
+                    "Generate test cases for a Jira issue ONLY when explicitly requested. "
+                    "Use only when the user asks for test cases or test generation. "
+                    "Input: 'issue_id:PROJ-123|question:create tests'"
+                ),
+            )
+        )
+
+        tools.append(
+            Tool(
+                name="create_jira_issue",
+                func=self._handle_issue_creation,
+                description=(
+                    "Create a new Jira issue when the user requests issue creation. "
+                    "Input: 'description:Fix bug|project:PROJ'"
+                ),
+            )
+        )
+
+        tools.append(
+            Tool(
+                name="get_current_context",
+                func=lambda _: self._get_current_context(),
+                description="Return the current conversation context when asked.",
+            )
+        )
+
+ #       tools.append(
+#           Tool(
+ #               name="classify_intent",
+ #               func=self._classify_intent,
+ #               description="Classify user intent as VALIDATE, OPERATE, INSIGHT, TEST, CREATE, or UNKNOWN",
+ #           )
+ #       )
+
+        return tools
+
+    def _create_agent_executor(self) -> AgentExecutor: # type: ignore
+        # Try to load the multi-step reasoning template first
+        try:
+            multi_step_template = load_prompt("multi_step_reasoning.txt")
+            if multi_step_template:
+                template = multi_step_template
+                logger.debug("Using multi-step reasoning template")
+            else:
+                raise FileNotFoundError("Multi-step template not found")
+        except Exception:
+            # Fallback to the original template
+            logger.debug("Using fallback template")
+            template = (
+                "Answer the following questions as best you can. You have access to the following tools:\n\n"
+                "{tools}\n\n"
+                "Use the following format:\n\n"
+                "Question: the input question you must answer\n"
+                "Thought: you should always think about what to do\n"
+                "Action: the action to take, should be one of [{tool_names}]\n"
+                "Action Input: the input to the action\n"
+                "Observation: the result of the action\n"
+                "... (this Thought/Action/Action Input/Observation can repeat N times)\n"
+                "Thought: I now know the final answer\n"
+                "Final Answer: the final answer to the original input question\n\n"
+                "Begin!\n\n"
+                "Question: {input}\n"
+                "Thought: {agent_scratchpad}"
+            )
+        
+        prompt = PromptTemplate.from_template(template)
+        agent = create_react_agent(llm=self.llm, tools=self.tools, prompt=prompt)
+        return AgentExecutor(
+            agent=agent,
+            tools=self.tools,
+            memory=self.memory,
+            verbose=True,
+            max_iterations=5,
+            handle_parsing_errors=True,
+        )
+
+    # ------------------------------------------------------------------
+    # Tool handlers
+    # ------------------------------------------------------------------
+    def _handle_insights(self, input_str: str) -> str:
+        try:
+            parts = self._parse_tool_input(input_str)
+            issue_id = parts.get("issue_id", "")
+            question = parts.get("question", "Tell me about this issue")
+            if not issue_id:
+                issue_id = self.session_memory.current_issue
+                if not issue_id:
+                    return "No issue ID provided and no current issue in context"
+            self.session_memory.current_issue = issue_id
+            return self.insights.ask(issue_id, question)
+        except Exception as exc:
+            logger.exception("Error in insights handler")
+            return f"Error getting insights: {exc}"
+
+    def _handle_validation(self, input_str: str) -> str:
+        try:
+            parts = self._parse_tool_input(input_str)
+            issue_id = parts.get("issue_id", "")
+            if not issue_id:
+                issue_id = self.session_memory.current_issue
+                if not issue_id:
+                    return "No issue ID provided and no current issue in context"
+            issue_json = get_issue_by_id_tool.run(issue_id)
+            issue = json.loads(issue_json)
+            result = self.validator.validate(issue)
+            
+            # When called as a tool from LangChain agent, don't auto-post validation comments
+            # This prevents validation results from interfering with successful operations
+            # The validation result is returned to the agent for decision-making only
+            logger.debug("Validation tool called - returning result without auto-posting comment")
+            return result
+        except Exception as exc:
+            logger.exception("Error in validation handler")
+            return f"Error validating issue: {exc}"
+
+    def _handle_operations(self, input_str: str) -> str:
+        try:
+            parts = self._parse_tool_input(input_str)
+            issue_id = parts.get("issue_id", "")
+            question = parts.get("question", "")
+            if not issue_id:
+                issue_id = self.session_memory.current_issue
+                if not issue_id:
+                    return "No issue ID provided and no current issue in context"
+            self.session_memory.current_issue = issue_id
+            return self.operations.operate(question, issue_id=issue_id)
+        except Exception as exc:
+            logger.exception("Error in operations handler")
+            return f"Error performing operation: {exc}"
+
+    def _handle_test_generation(self, input_str: str) -> str:
+        try:
+            parts = self._parse_tool_input(input_str)
+            issue_id = parts.get("issue_id", "")
+            question = parts.get("question", "Generate test cases")
+            if not issue_id:
+                issue_id = self.session_memory.current_issue
+                if not issue_id:
+                    return "No issue ID provided and no current issue in context"
+            return self._generate_tests(issue_id, question)
+        except Exception as exc:
+            logger.exception("Error in test generation handler")
+            return f"Error generating tests: {exc}"
+
+    def _handle_issue_creation(self, input_str: str) -> str:
+        try:
+            parts = self._parse_tool_input(input_str)
+            description = parts.get("description", "")
+            project = parts.get("project", "")
+            if not project and self.config.projects:
+                project = self.config.projects[0]
+            if not project:
+                return "No project specified and no default project configured"
+            return self.creator.create_issue(description, project)
+        except Exception as exc:
+            logger.exception("Error in issue creation handler")
+            return f"Error creating issue: {exc}"
+
+    def _get_current_context(self) -> str:
+        context = {
+            "current_issue": self.session_memory.current_issue,
+            "recent_questions": len(self.session_memory.chat_history),
+            "configured_projects": self.config.projects or [],
+        }
+        return json.dumps(context, indent=2)
+
+    def _classify_and_validate(self, issue_id: str, **kwargs: Any) -> str:
         logger.info("Running classification/validation flow for %s", issue_id)
         issue_json = get_issue_by_id_tool.run(issue_id)
         issue = json.loads(issue_json)
         fields = issue.get("fields", {})
-        base_prompt = safe_format(
+        prompt = safe_format(
             load_prompt("classifier.txt"),
             {
                 "summary": fields.get("summary", ""),
                 "description": fields.get("description", ""),
             },
         )
-
-        prompt = (
-            f"Conversation context:\n{history}\n\n{base_prompt}" if history else base_prompt
-        )
         label = self.classifier.classify(prompt, **kwargs)
         logger.debug("Classifier label: %s", label)
         if str(label).upper().startswith("API"):
-            return self.validator.validate(issue, history=history, **kwargs)
+            return self.validator.validate(issue, **kwargs)
         return "Issue not API related"
 
     def _handle_validation_result(self, issue_id: str, result: str) -> bool:
@@ -317,22 +411,8 @@ class RouterAgent:
             comment = None
         else:
             comment = data.get("jira_comment") if isinstance(data, dict) else None
-        if comment:
+        if comment and self.config.write_comments_to_jira:
             comment = normalize_newlines(comment)
-            if not self.config.write_comments_to_jira:
-                logger.info(
-                    "write_comments_to_jira disabled; skipping comment to %s",
-                    issue_id,
-                )
-                return False
-            if self.config.ask_for_confirmation:
-                self._confirm_issue = issue_id
-                self._confirm_comment = comment
-                self._pending_confirmation = (
-                    f"Post validation comment to {issue_id}? (yes/no)"
-                )
-                logger.info("Awaiting user confirmation to comment on %s", issue_id)
-                return False
             try:
                 self.operations.add_comment(issue_id, comment)
                 logger.info("Posted validation comment to %s", issue_id)
@@ -342,7 +422,7 @@ class RouterAgent:
         return False
 
     def _generate_test_cases(
-        self, issue_id: str, question: str, history: str = "", **kwargs: Any
+        self, issue_id: str, question: str, **kwargs: Any
     ) -> str | None:
         """Return test cases string generated from Jira ``issue_id``.
 
@@ -356,7 +436,7 @@ class RouterAgent:
             summary = fields.get("summary", "") or ""
             description = fields.get("description", "") or ""
             text = f"{summary}\n{description}\n{question}"
-            tests = self.tester.create_test_cases(text, None, history=history, **kwargs)
+            tests = self.tester.create_test_cases(text, None, **kwargs)
             return tests
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
@@ -381,10 +461,9 @@ class RouterAgent:
             logger.exception("Failed to update description for %s", issue_id)
             return False
 
-    def _generate_tests(self, issue_id: str, question: str, history: str = "", **kwargs: Any) -> str:
+    def _generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
         """Return generated test cases and update Jira when possible."""
-        enhanced_question = f"{history}\n\nCurrent request: {question}" if history else question
-        tests = self._generate_test_cases(issue_id, enhanced_question, history=history, **kwargs)
+        tests = self._generate_test_cases(issue_id, question, **kwargs)
 
         if tests is None or tests == EXISTING_TESTS_MSG:
             return EXISTING_TESTS_MSG
@@ -395,7 +474,7 @@ class RouterAgent:
                 cleaned += "\n\nDescription updated with generated tests."
         return cleaned
 
-    def _execute_operations_plan(self, plan: dict[str, Any], history: str = "", **kwargs: Any) -> str:
+    def _execute_operations_plan(self, plan: dict[str, Any], **kwargs: Any) -> str:
         """Execute a multi-step Jira operations plan."""
         issue_key = plan.get("issue_key") or self.session_memory.current_issue
         if not issue_key:
@@ -406,11 +485,15 @@ class RouterAgent:
         steps = plan.get("plan") or []
         if not isinstance(steps, list):
             return "Plan did not contain actionable steps"
+        
+        logger.info("Executing %d-step plan for issue %s", len(steps), issue_key)
         results = []
-        for step in steps:
+        for i, step in enumerate(steps, 1):
             agent = step.get("agent")
             action = step.get("action")
             params = step.get("parameters") or {}
+            logger.info("Step %d/%d: %s.%s with params %s", i, len(steps), agent, action, params)
+            
             if agent != "jira_operations":
                 results.append(f"Unknown agent {agent}")
                 continue
@@ -422,8 +505,10 @@ class RouterAgent:
                 result = func(issue_key, **params, **kwargs)
                 if isinstance(result, str) and result.startswith("Error"):
                     results.append(f"Failed {action}: {result}")
+                    logger.warning("Step %d failed: %s", i, result)
                 else:
                     results.append(f"Executed {action} successfully")
+                    logger.info("Step %d completed successfully", i)
             except Exception as exc:
                 logger.exception("Failed step %s", action)
                 results.append(f"Failed {action}: {exc}")
@@ -433,131 +518,76 @@ class RouterAgent:
     # Public API
     # ------------------------------------------------------------------
     def ask(self, question: str, **kwargs: Any) -> str:
-        """Route ``question`` to the appropriate workflow."""
+        """Answer ``question`` using LangChain when available."""
         logger.info("Router received question: %s", question)
-        used_executor = False
 
         notice = self._check_history_limit()
-
-        if self._pending_confirmation:
-            user_reply = question.strip().lower()
-            issue = self._confirm_issue
-            comment = self._confirm_comment
-            self._pending_confirmation = None
-            self._confirm_issue = None
-            self._confirm_comment = None
-            if user_reply in ("y", "yes") and issue and comment:
-                try:
-                    self.operations.add_comment(issue, comment)
-                    answer = "✅ Comment posted."
-                except Exception:
-                    logger.exception("Failed to post confirmation comment")
-                    answer = "Failed to add comment."
-            else:
-                answer = "🚫 Operation cancelled."
-            if self.use_memory and self.memory is not None:
-                self.memory.save_context({"input": question}, {"output": answer})
-            self.session_memory.save_context({"input": question}, {"output": answer})
-            return answer
 
         issue_id = self._extract_issue_id(question)
         if issue_id:
             self.session_memory.current_issue = issue_id
+
+        if self.agent_executor is None:
+            answer = self._basic_routing(question, **kwargs)
         else:
-            issue_id = self.session_memory.current_issue
-
-        conversation_history = self.prepare_conversation_history()
-
-        try:
-            intent = self._classify_intent_with_context(question, **kwargs)
-            if intent.startswith("OPERATE"):
-                logger.info("Routing to operations workflow")
-                plan = self.planner.generate_plan(
-                    question, {"issue_key": issue_id or ""}, **kwargs
+            try:
+                context = self._get_current_context()
+                enhanced_question = (
+                    f"Current context: {context}\n\nQuestion: {question}"
                 )
-                if plan.get("plan"):
-                    answer = self._execute_operations_plan(plan, history=conversation_history, **kwargs)
-                else:
-                    answer = self.operations.operate(
-                        question, issue_id=issue_id, history=conversation_history, **kwargs
-                    )
-            elif intent.startswith("CREATE"):
-                logger.info("Routing to issue creation workflow")
-                project_key = self._extract_project_key(question)
-                if not project_key and self.config.projects:
-                    project_key = self.config.projects[0]
-                if not project_key:
-                    answer = "Please specify a Jira project key"
-                else:
-                    answer = self.creator.create_issue(question, project_key, history=conversation_history, **kwargs)
-            else:
-                if not issue_id:
-                    answer = (
-                        "I'm sorry, I didn't catch an issue key in your question. "
-                        "Could you specify which Jira issue you mean?"
-                    )
-                    if self.use_memory and self.memory is not None:
-                        self.memory.save_context(
-                            {"input": question}, {"output": answer}
-                        )
-                    self.session_memory.save_context(
-                        {"input": question}, {"output": answer}
-                    )
-                    return answer
-                if intent.startswith("VALIDATE"):
-                    logger.info("Routing to validation workflow")
-                    answer = self._classify_and_validate(issue_id, history=conversation_history, **kwargs)
-                    comment_posted = self._handle_validation_result(issue_id, answer)
-                    if self._pending_confirmation:
-                        answer = self._pending_confirmation
-                        if self.use_memory and self.memory is not None:
-                            self.memory.save_context(
-                                {"input": question}, {"output": answer}
-                            )
-                        self.session_memory.save_context(
-                            {"input": question}, {"output": answer}
-                        )
-                        return answer
-                    if comment_posted:
-                        answer += "\n\nValidation summary posted as a Jira comment."
-                elif intent.startswith("TEST"):
-                    logger.info("Routing to test generation workflow")
-                    answer = self._generate_tests(issue_id, question, history=conversation_history, **kwargs)
-                else:
-                    logger.info("Routing to general insights workflow")
-                    if self.insight_executor is not None:
-                        answer = self.insight_executor.run(question)
-                        used_executor = True
-                    else:
-                        answer = self.insights.ask(issue_id, question, **kwargs)
-        except JIRAError:
-            logger.exception("Jira error while fetching issue %s", issue_id)
-            answer = f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
-        except OpenAIError:
-            logger.exception("OpenAI API error")
-            answer = (
-                "I'm having trouble communicating with the language model right now. "
-                "Please try again later."
-            )
-        except RuntimeError as exc:
-            logger.exception("Runtime error while processing question")
-            msg = str(exc)
-            if "validation prompt" in msg.lower():
-                answer = f"Sorry, {msg}"
-            else:
-                answer = msg
-        except ValueError as exc:
-            logger.exception("Value error while processing question")
-            answer = str(exc)
-        except Exception:
-            logger.exception("Unexpected error while processing question")
-            answer = "Sorry, something went wrong while handling your request."
-        if self.use_memory and self.memory is not None and not used_executor:
-            self.memory.save_context({"input": question}, {"output": answer})
+                result = self.agent_executor.invoke({"input": enhanced_question})
+                answer = result.get("output", "I couldn't process your request.")
+            except Exception as exc:
+                logger.exception("Error in agent executor")
+                answer = f"I encountered an error processing your request: {exc}"
+
         if notice:
             answer = f"{notice}\n\n{answer}"
         self.session_memory.save_context({"input": question}, {"output": answer})
         return answer
+
+    # ------------------------------------------------------------------
+    # Fallback routing
+    # ------------------------------------------------------------------
+    def _basic_routing(self, question: str, **kwargs: Any) -> str:
+        issue_id = self._extract_issue_id(question) or self.session_memory.current_issue
+        try:
+            intent = self._classify_intent(question, **kwargs)
+            if intent.startswith("OPERATE"):
+                plan = self.planner.generate_plan(question, {"issue_key": issue_id or ""}, **kwargs)
+                if plan.get("plan"):
+                    return self._execute_operations_plan(plan, **kwargs)
+                return self.operations.operate(question, issue_id=issue_id, **kwargs)
+            if intent.startswith("CREATE"):
+                project_key = self._extract_project_key(question) or (self.config.projects[0] if self.config.projects else None)
+                if not project_key:
+                    return "Please specify a Jira project key"
+                return self.creator.create_issue(question, project_key, **kwargs)
+            if not issue_id:
+                return (
+                    "I'm sorry, I didn't catch an issue key in your question. "
+                    "Could you specify which Jira issue you mean?"
+                )
+            if intent.startswith("VALIDATE"):
+                result = self._classify_and_validate(issue_id, **kwargs)
+                if self._handle_validation_result(issue_id, result):
+                    result += "\n\nValidation summary posted as a Jira comment."
+                return result
+            if intent.startswith("TEST"):
+                return self._generate_tests(issue_id, question, **kwargs)
+            return self.insights.ask(issue_id, question, **kwargs)
+        except JIRAError:
+            logger.exception("Jira error while fetching issue %s", issue_id)
+            return f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
+        except OpenAIError:
+            logger.exception("OpenAI API error")
+            return (
+                "I'm having trouble communicating with the language model right now. "
+                "Please try again later."
+            )
+        except Exception:
+            logger.exception("Unexpected error while processing question")
+            return "Sorry, something went wrong while handling your request."
 
 
 __all__ = ["RouterAgent"]

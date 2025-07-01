@@ -6,7 +6,7 @@ from typing import Optional
 
 from .openai_client import OpenAIClient
 from .claude_client import ClaudeClient
-from .base_llm_client import BaseLLMClient, extract_text
+from .base_llm_client import BaseLLMClient
 from .langchain_factory import create_langchain_llm
 from src.configs.config import load_config
 
@@ -33,6 +33,5 @@ __all__ = [
     "ClaudeClient",
     "create_llm_client",
     "create_langchain_llm",
-    "extract_text",
-]
+    ]
 
