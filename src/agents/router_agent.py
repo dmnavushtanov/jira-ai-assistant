@@ -81,8 +81,8 @@ class RouterAgent:
         self.history_prompt = load_prompt("needs_history.txt")
         self.intent_prompt = load_prompt("intent_classifier.txt")
         self.llm = None
-        self.tools: List[BaseTool] = []
-        self.agent_executor: AgentExecutor | None = None
+        self.tools: List["BaseTool"] = [] # type: ignore
+        self.agent_executor: "AgentExecutor" | None = None # type: ignore
 
         if AgentExecutor is not None and Tool is not None and PromptTemplate is not None:
             self.llm = create_langchain_llm(config_path)
@@ -176,10 +176,10 @@ class RouterAgent:
                 parts[key.strip()] = value.strip()
         return parts
 
-    def _create_tools(self) -> List[BaseTool]:
+    def _create_tools(self) -> List["BaseTool"]: # type: ignore
         if Tool is None:
             return []
-        tools: List[BaseTool] = []
+        tools: List["BaseTool"] = [] # type: ignore
         tools.append(
             Tool(
                 name="get_issue_insights",
@@ -257,7 +257,7 @@ class RouterAgent:
 
         return tools
 
-    def _create_agent_executor(self) -> AgentExecutor: # type: ignore
+    def _create_agent_executor(self) -> "AgentExecutor": # type: ignore
         # Try to load the multi-step reasoning template first
         try:
             multi_step_template = load_prompt("multi_step_reasoning.txt")
