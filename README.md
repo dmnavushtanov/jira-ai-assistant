@@ -23,7 +23,6 @@ LANGCHAIN_DEBUG=false
 RICH_LOGGING=true
 STRIP_UNUSED_JIRA_DATA=true
 FOLLOW_RELATED_JIRAS=false
-ASK_FOR_CONFIRMATION=false
 LOG_JIRA_PAYLOADS=true
 ```
 
@@ -36,7 +35,6 @@ The assistant also remembers the last Jira key you referenced. Follow-up questio
 
 Set `strip_unused_jira_data: true` in the config to remove avatar URLs and ID fields from Jira payloads for more concise outputs.
 Set `follow_related_jiras: true` to automatically fetch and summarize linked issues and subtasks when answering questions. Comments from those related tickets are also retrieved so important context isn't missed.
-Set `ask_for_confirmation: true` to require a confirmation prompt before any changes are made in Jira, including creating issues, updating fields and posting comments.
 Set `log_jira_payloads: false` to disable logging raw Jira API payloads returned by the tools. When disabled, some tools such as `transition_issue` return only minimal data to avoid large debug logs.
 
 ### Debug Logging
