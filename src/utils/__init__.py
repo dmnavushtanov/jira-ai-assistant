@@ -12,6 +12,7 @@ from .rich_logger import RichLogger
 from .context_memory import JiraContextMemory
 from .http_client import SimpleHttpClient
 from .json_utils import parse_json_block
+from .plan_executor import OperationsPlanExecutor
 import logging
 
 from src.configs.config import load_config
@@ -40,5 +41,6 @@ __all__ = [
     "JiraContextMemory",
     "SimpleHttpClient",
     "parse_json_block",
+    "OperationsPlanExecutor",
     "confirm_action",
 ]

@@ -37,6 +37,7 @@ from ..utils import (
     JiraContextMemory,
     parse_json_block,
     normalize_newlines,
+    OperationsPlanExecutor,
 )
 
 from jira import JIRAError
@@ -59,6 +60,7 @@ class RouterAgent:
         self.tester = TestAgent(config_path)
         self.creator = IssueCreatorAgent(config_path)
         self.planner = PlanningAgent(config_path)
+        self.plan_executor = OperationsPlanExecutor(self.operations)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
 
@@ -495,45 +497,18 @@ class RouterAgent:
                 cleaned += "\n\nDescription updated with generated tests."
         return cleaned
 
-    def _execute_operations_plan(self, plan: dict[str, Any], **kwargs: Any) -> str:
-        """Execute a multi-step Jira operations plan."""
+    def _execute_operations_plan(self, plan: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        """Execute a multi-step Jira operations plan sequentially."""
         issue_key = plan.get("issue_key") or self.session_memory.current_issue
         if not issue_key:
-            return (
-                "I'm sorry, I couldn't determine which Jira issue to use. "
-                "Could you specify the issue key?"
-            )
-        steps = plan.get("plan") or []
-        if not isinstance(steps, list):
-            return "Plan did not contain actionable steps"
-        
-        logger.info("Executing %d-step plan for issue %s", len(steps), issue_key)
-        results = []
-        for i, step in enumerate(steps, 1):
-            agent = step.get("agent")
-            action = step.get("action")
-            params = step.get("parameters") or {}
-            logger.info("Step %d/%d: %s.%s with params %s", i, len(steps), agent, action, params)
-            
-            if agent != "jira_operations":
-                results.append(f"Unknown agent {agent}")
-                continue
-            func = getattr(self.operations, action, None)
-            if not callable(func):
-                results.append(f"Unknown action {action}")
-                continue
-            try:
-                result = func(issue_key, **params, **kwargs)
-                if isinstance(result, str) and result.startswith("Error"):
-                    results.append(f"Failed {action}: {result}")
-                    logger.warning("Step %d failed: %s", i, result)
-                else:
-                    results.append(f"Executed {action} successfully")
-                    logger.info("Step %d completed successfully", i)
-            except Exception as exc:
-                logger.exception("Failed step %s", action)
-                results.append(f"Failed {action}: {exc}")
-        return "\n".join(results)
+            return {
+                "error": (
+                    "I'm sorry, I couldn't determine which Jira issue to use. "
+                    "Could you specify the issue key?"
+                )
+            }
+
+        return self.plan_executor.execute(plan, issue_key, **kwargs)
 
     # ------------------------------------------------------------------
     # Public API
@@ -580,7 +555,13 @@ class RouterAgent:
             if intent.startswith("OPERATE"):
                 plan = self.planner.generate_plan(question, {"issue_key": issue_id or ""}, **kwargs)
                 if plan.get("plan"):
-                    return self._execute_operations_plan(plan, **kwargs)
+                    results = self._execute_operations_plan(plan, **kwargs)
+                    summary = []
+                    for i in range(1, len(results) + 1):
+                        step_key = f"step_{i}"
+                        res = results.get(step_key)
+                        summary.append(f"{step_key}: {res}")
+                    return "\n".join(summary)
                 return self.operations.operate(question, issue_id=issue_id, **kwargs)
             if intent.startswith("CREATE"):
                 project_key = self._extract_project_key(question) or (self.config.projects[0] if self.config.projects else None)

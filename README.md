@@ -130,7 +130,9 @@ classified with the `CREATE` intent and routed through this agent.
 The `PlanningAgent` can break down a request into multiple Jira actions. For
 example asking to add a comment and then move the ticket will produce a plan
 containing both steps. The router executes each step in order and reports which
-actions succeeded or failed.
+actions succeeded or failed. Results from each step are stored and may be
+referenced by later steps using placeholders like `$step1` or
+`$step1.field`. Tasks are executed strictly in the planned sequence.
 
 ### Error Handling
 
