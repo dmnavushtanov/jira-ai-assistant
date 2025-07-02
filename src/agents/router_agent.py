@@ -7,18 +7,15 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-try:
+try:  # Provide a clear error if LangChain is missing
     from langchain.agents import AgentExecutor, create_react_agent
     from langchain.tools import Tool, BaseTool  # type: ignore
     from langchain.memory import ConversationBufferWindowMemory
     from langchain.prompts import PromptTemplate
-
-except Exception:  # pragma: no cover - optional dependency
-    AgentExecutor = None
-    BaseTool = None
-    Tool = None
-    ConversationBufferWindowMemory = None
-    PromptTemplate = None
+except ImportError as exc:  # pragma: no cover - hard dependency
+    raise ImportError(
+        "LangChain is required to use RouterAgent. Install it with `pip install langchain langchain-community langchain-openai`."
+    ) from exc
 
 
 from ..configs.config import load_config
@@ -41,7 +38,6 @@ from ..utils import (
 )
 
 from jira import JIRAError
-from openai import OpenAIError
 
 logger = logging.getLogger(__name__)
 logger.debug("router_agent module loaded")
@@ -86,33 +82,26 @@ class RouterAgent:
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
 
-        if self.use_memory and ConversationBufferWindowMemory is not None:
+        if self.use_memory:
             self.memory = ConversationBufferWindowMemory(
                 k=self.max_history,
                 return_messages=True,
                 memory_key="chat_history",
             )
         else:
-            if self.use_memory:
-                logger.warning("LangChain not installed; conversation memory disabled")
-            self.use_memory = False
             self.memory = None
         if self.config.projects:
             pattern = "|".join(re.escape(p) for p in self.config.projects)
         else:
             pattern = r"[A-Za-z][A-Za-z0-9]+"
         self.issue_re = re.compile(rf"(?:{pattern})-\d+", re.IGNORECASE)
-        self.llm = None
-        self.tools: List["BaseTool"] = [] # type: ignore
-        self.agent_executor: "AgentExecutor" | None = None # type: ignore
-
-        if AgentExecutor is not None and Tool is not None and PromptTemplate is not None:
-            self.llm = create_langchain_llm(config_path)
-            self.tools = self._create_tools()
-            if self.use_memory:
-                self.agent_executor = self._create_agent_executor()
-        else:
-            logger.warning("LangChain not installed; advanced routing disabled")
+        self.llm = create_langchain_llm(config_path)
+        self.tools = self._create_tools()
+        try:
+            self.agent_executor = self._create_agent_executor()
+        except Exception:
+            logger.exception("Failed to create LangChain agent executor")
+            self.agent_executor = None
 
     # ------------------------------------------------------------------
     # Helpers
@@ -150,7 +139,7 @@ class RouterAgent:
     def _check_history_limit(self) -> str | None:
         """Reset chat history when it grows too large.
 
-        When LangChain memory isn't available the CLI prompt normally asks the
+        When conversation memory is disabled the CLI prompt normally asks the
         user to start a new conversation once ``max_history`` is exceeded. In a
         non-interactive setting there is no opportunity for user input. This
         helper automatically clears :class:`JiraContextMemory` and returns a
@@ -169,8 +158,6 @@ class RouterAgent:
     # ------------------------------------------------------------------
 
     def _create_tools(self) -> List["BaseTool"]: # type: ignore
-        if Tool is None:
-            return []
         tools: List["BaseTool"] = [] # type: ignore
         tools.append(
             Tool(
@@ -488,7 +475,7 @@ class RouterAgent:
     # Public API
     # ------------------------------------------------------------------
     def ask(self, question: str, **kwargs: Any) -> str:
-        """Answer ``question`` using LangChain when available."""
+        """Answer ``question`` using the LangChain agent."""
         logger.info("Router received question: %s", question)
 
         notice = self._check_history_limit()
@@ -498,56 +485,26 @@ class RouterAgent:
             self.session_memory.current_issue = issue_id
 
         if self.agent_executor is None:
-            answer = self._basic_routing(question, **kwargs)
-        else:
-            try:
-                context = self._get_current_context()
-                enhanced_question = (
-                    f"Current context: {context}\n\nQuestion: {question}"
-                )
-                result = self.agent_executor.invoke({"input": enhanced_question})
-                if result:
-                    answer = result.get("output", "I couldn't process your request.")
-                else:
-                    answer = "I couldn't process your request."
-            except Exception as exc:
-                logger.exception("Error in agent executor")
-                answer = f"I encountered an error processing your request: {exc}"
+            raise RuntimeError(
+                "RouterAgent failed to initialize the LangChain agent executor."
+            )
+
+        try:
+            context = self._get_current_context()
+            enhanced_question = f"Current context: {context}\n\nQuestion: {question}"
+            result = self.agent_executor.invoke({"input": enhanced_question})
+            if result:
+                answer = result.get("output", "I couldn't process your request.")
+            else:
+                answer = "I couldn't process your request."
+        except Exception as exc:
+            logger.exception("Error in agent executor")
+            answer = f"I encountered an error processing your request: {exc}"
 
         if notice:
             answer = f"{notice}\n\n{answer}"
         self.session_memory.save_context({"input": question}, {"output": answer})
         return answer
-
-    # ------------------------------------------------------------------
-    # Fallback routing
-    # ------------------------------------------------------------------
-    def _basic_routing(self, question: str, **kwargs: Any) -> str:
-        issue_id = self._extract_issue_id(question) or self.session_memory.current_issue
-        try:
-            plan = self.planner.generate_plan(question, {"issue_key": issue_id or ""}, **kwargs)
-            if not plan.get("plan"):
-                return "I'm sorry, I couldn't generate a plan for your request."
-
-            results = self._execute_operations_plan(plan, **kwargs)
-            summary = []
-            for i in range(1, len(results) + 1):
-                step_key = f"step_{i}"
-                res = results.get(step_key)
-                summary.append(f"{step_key}: {res}")
-            return "\n".join(summary)
-        except JIRAError:
-            logger.exception("Jira error while fetching issue %s", issue_id)
-            return f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."
-        except OpenAIError:
-            logger.exception("OpenAI API error")
-            return (
-                "I'm having trouble communicating with the language model right now. "
-                "Please try again later."
-            )
-        except Exception:
-            logger.exception("Unexpected error while processing question")
-            return "Sorry, something went wrong while handling your request."
 
 
 __all__ = ["RouterAgent"]
