@@ -6,6 +6,8 @@ import json
 import logging
 from typing import Any, Optional
 
+from src.models import SharedContext
+
 from src.services.jira_service import (
     add_comment_to_issue_tool,
     create_jira_issue_tool,
@@ -31,6 +33,7 @@ class JiraOperationsAgent:
         self,
         config_path: str | None = None,
         memory: Optional[JiraContextMemory] = None,
+        context: Optional[SharedContext] = None,
     ) -> None:
         logger.debug(
             "Initializing JiraOperationsAgent with config_path=%s", config_path
@@ -38,7 +41,10 @@ class JiraOperationsAgent:
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
         self.memory = memory
-        self.insights = IssueInsightsAgent(config_path, memory=memory)
+        self.context = context
+        self.insights = IssueInsightsAgent(
+            config_path, memory=memory, context=context
+        )
 
         # Tools available to this agent
         self.tools = [

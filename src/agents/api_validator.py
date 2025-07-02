@@ -9,6 +9,7 @@ from pathlib import Path
 
 from src.prompts import load_prompt, PROMPTS_DIR
 from src.utils import extract_plain_text, safe_format, JiraContextMemory
+from src.models import SharedContext
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 
@@ -41,6 +42,7 @@ class ApiValidatorAgent:
         self,
         config_path: str | None = None,
         memory: Optional[JiraContextMemory] = None,
+        context: Optional[SharedContext] = None,
     ) -> None:
         logger.debug(
             "Initializing ApiValidatorAgent with config_path=%s", config_path
@@ -48,6 +50,7 @@ class ApiValidatorAgent:
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
         self.memory = memory
+        self.context = context
 
         self.prompts = _load_status_prompts(self.config.validation_prompts_dir)
         self.general_prompt = load_prompt(
