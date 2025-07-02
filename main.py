@@ -11,11 +11,7 @@ from dotenv import load_dotenv
 from src.agents.router_agent import RouterAgent
 from src.configs import load_config, setup_logging
 import logging
-
-try:
-    import langchain
-except Exception:  # pragma: no cover - langchain optional
-    langchain = None
+import langchain
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +27,7 @@ def main() -> None:
 
     logger.debug("Instantiating RouterAgent")
     router = RouterAgent()
-    if langchain is not None:
-        logger.info("LangChain available - advanced routing enabled")
+    logger.info("LangChain available - advanced routing enabled")
 
     while True:
         question = input("Enter your question (type 'exit' to quit): ").strip()

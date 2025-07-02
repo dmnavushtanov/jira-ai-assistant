@@ -7,6 +7,13 @@ This repository contains a Jira AI assistant that communicates with the OpenAI A
 - A minimal agent that combines both capabilities
 - Automated test case generation for API issues
 
+This project requires the LangChain library and related packages. Install all
+dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Configuration
 
 Create a `.env` file and provide your credentials:
@@ -29,7 +36,7 @@ LOG_JIRA_PAYLOADS=true
 The default model and provider can be changed in `src/configs/config.yml` or by setting `OPENAI_MODEL` and `BASE_LLM` in the environment. The flag `INCLUDE_WHOLE_API_BODY` controls whether validation prompts should return the full API bodies or only boolean indicators of their validity.
 
 
-Conversation memory can be enabled with `conversation_memory: true` in the same file. The number of previous questions remembered defaults to three and can be adjusted via `max_questions_to_remember`. When LangChain is available the agent uses a `ConversationBufferWindowMemory` of size `k`. If `k` is greater than three the buffer is combined with `ConversationSummaryMemory` so older turns are summarized automatically. When the limit is reached you'll be prompted to start a new conversation. If LangChain is not installed or memory is disabled the session is cleared automatically once the limit is reached and a short notice is returned before the answer.
+Conversation memory can be enabled with `conversation_memory: true` in the same file. The number of previous questions remembered defaults to three and can be adjusted via `max_questions_to_remember`. The agent uses a LangChain `ConversationBufferWindowMemory` of size `k`. If `k` is greater than three the buffer is combined with `ConversationSummaryMemory` so older turns are summarized automatically. When the limit is reached you'll be prompted to start a new conversation. If memory is disabled the session is cleared automatically once the limit is reached and a short notice is returned before the answer.
 
 The assistant also remembers the last Jira key you referenced. Follow-up questions can omit the key and it will use the stored value. Include the word `forget` in your message to clear this memory.
 
@@ -95,7 +102,7 @@ The `/ask` endpoint accepts a JSON payload containing a `question` field and ret
 
 ### Test Case Generation
 
-Ask the assistant for test cases and it will attempt to generate them directly. Validation can be run separately if needed. The generation step first checks the description for existing tests and informs you when they are already present instead of generating new ones. When LangChain is installed the **TestAgent** now runs a planning pipeline that detects the HTTP method and summarizes the context before generating tests. If the method cannot be identified, the default prompt is used. If the ticket lacks enough details the assistant will reply "Not enough information to generate test cases." otherwise it returns basic scenarios. A ReAct agent is also created from these tools so the pipeline can be invoked externally when needed.
+Ask the assistant for test cases and it will attempt to generate them directly. Validation can be run separately if needed. The generation step first checks the description for existing tests and informs you when they are already present instead of generating new ones. The **TestAgent** runs a planning pipeline that detects the HTTP method and summarizes the context before generating tests. If the method cannot be identified, the default prompt is used. If the ticket lacks enough details the assistant will reply "Not enough information to generate test cases." otherwise it returns basic scenarios. A ReAct agent is also created from these tools so the pipeline can be invoked externally when needed.
 
 When tests are successfully generated they are appended to the end of the issue's
 **Description** field using the Jira API.
