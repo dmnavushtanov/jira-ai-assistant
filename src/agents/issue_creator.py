@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from src.agents.jira_operations import JiraOperationsAgent
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
-from src.utils import safe_format, parse_json_block
+from src.utils import safe_format, parse_json_block, JiraContextMemory
 
 logger = logging.getLogger(__name__)
 logger.debug("issue_creator module loaded")
@@ -19,11 +19,18 @@ logger.debug("issue_creator module loaded")
 class IssueCreatorAgent:
     """Agent that extracts issue details and creates Jira tickets."""
 
-    def __init__(self, config_path: str | None = None) -> None:
-        logger.debug("Initializing IssueCreatorAgent with config_path=%s", config_path)
+    def __init__(
+        self,
+        config_path: str | None = None,
+        memory: Optional[JiraContextMemory] = None,
+    ) -> None:
+        logger.debug(
+            "Initializing IssueCreatorAgent with config_path=%s", config_path
+        )
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
-        self.operations = JiraOperationsAgent(config_path)
+        self.memory = memory
+        self.operations = JiraOperationsAgent(config_path, memory=memory)
         self.plan_prompt = load_prompt("issue_plan.txt")
 
     def plan_issue(self, request: str, history: str = "", **kwargs: Any) -> dict[str, Any]:

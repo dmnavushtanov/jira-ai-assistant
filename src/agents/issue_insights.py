@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from datetime import datetime
 
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
-from src.utils import safe_format
+from src.utils import safe_format, JiraContextMemory
 from src.services.jira_service import (
     get_issue_by_id_tool,
     get_issue_history_tool,
@@ -25,10 +25,17 @@ logger.debug("issue_insights module loaded")
 class IssueInsightsAgent:
     """Agent that answers general questions about Jira issues."""
 
-    def __init__(self, config_path: str | None = None) -> None:
-        logger.debug("Initializing IssueInsightsAgent with config_path=%s", config_path)
+    def __init__(
+        self,
+        config_path: str | None = None,
+        memory: Optional[JiraContextMemory] = None,
+    ) -> None:
+        logger.debug(
+            "Initializing IssueInsightsAgent with config_path=%s", config_path
+        )
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
+        self.memory = memory
 
         # Tools available to this agent
         self.tools = [get_issue_by_id_tool, get_issue_history_tool]
