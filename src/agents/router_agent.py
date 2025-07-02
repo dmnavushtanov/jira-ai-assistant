@@ -24,7 +24,6 @@ except Exception:  # pragma: no cover - optional dependency
 from ..configs.config import load_config
 from ..llm_clients import create_langchain_llm
 from ..models import SharedContext
-from .classifier import ClassifierAgent
 from .issue_insights import IssueInsightsAgent
 from .api_validator import ApiValidatorAgent
 from .jira_operations import JiraOperationsAgent
@@ -56,9 +55,6 @@ class RouterAgent:
         self.config = load_config(config_path)
         self.session_memory = JiraContextMemory()
         self.shared_context = SharedContext()
-        self.classifier = ClassifierAgent(
-            config_path, memory=self.session_memory, context=self.shared_context
-        )
         self.validator = ApiValidatorAgent(
             config_path,
             memory=self.session_memory,
@@ -81,7 +77,12 @@ class RouterAgent:
         self.planner = PlanningAgent(
             config_path, memory=self.session_memory, context=self.shared_context
         )
-        self.plan_executor = OperationsPlanExecutor(self.operations)
+        self.plan_executor = OperationsPlanExecutor(
+            self.operations,
+            validator_agent=self.validator,
+            test_agent=self.tester,
+            insights_agent=self.insights,
+        )
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
 
@@ -101,8 +102,6 @@ class RouterAgent:
         else:
             pattern = r"[A-Za-z][A-Za-z0-9]+"
         self.issue_re = re.compile(rf"(?:{pattern})-\d+", re.IGNORECASE)
-        self.history_prompt = load_prompt("needs_history.txt")
-        self.intent_prompt = load_prompt("intent_classifier.txt")
         self.llm = None
         self.tools: List["BaseTool"] = [] # type: ignore
         self.agent_executor: "AgentExecutor" | None = None # type: ignore
@@ -147,28 +146,6 @@ class RouterAgent:
                 result[key.strip()] = value.strip()
         return result
 
-    def _classify_intent(self, question: str, **kwargs: Any) -> str:
-        """Return the intent label for ``question`` using the classifier agent."""
-        if not self.intent_prompt:
-            raise RuntimeError("Intent classification prompt not found")
-        prompt = safe_format(self.intent_prompt, {"question": question})
-        label = self.classifier.classify(prompt, **kwargs)
-        result = str(label).strip().upper()
-        logger.debug("Intent classification result: %s", result)
-        return result
-    def _should_validate(self, question: str, **kwargs: Any) -> bool:
-        """Return ``True`` if the detected intent is VALIDATE."""
-        return self._classify_intent(question, **kwargs).startswith("VALIDATE")
-
-    def _needs_history(self, question: str, **kwargs: Any) -> bool:
-        """Return True if the LLM determines the changelog is required."""
-        if not self.history_prompt:
-            raise RuntimeError("History check prompt not found")
-        prompt = safe_format(self.history_prompt, {"question": question})
-        label = self.classifier.classify(prompt, **kwargs)
-        result = str(label).strip().upper().startswith("HISTORY")
-        logger.debug("Needs history: %s (label=%s)", result, label)
-        return result
 
     def _check_history_limit(self) -> str | None:
         """Reset chat history when it grows too large.
@@ -262,13 +239,7 @@ class RouterAgent:
             )
         )
 
- #       tools.append(
-#           Tool(
- #               name="classify_intent",
- #               func=self._classify_intent,
- #               description="Classify user intent as VALIDATE, OPERATE, INSIGHT, TEST, CREATE, or UNKNOWN",
- #           )
- #       )
+
 
         return tools
 
@@ -402,25 +373,6 @@ class RouterAgent:
         }
         return json.dumps(context, indent=2)
 
-    def _classify_and_validate(self, issue_id: str, **kwargs: Any) -> str:
-        logger.info("Running classification/validation flow for %s", issue_id)
-        issue_json = get_issue_by_id_tool.run(issue_id)
-        issue = json.loads(issue_json)
-        fields = issue.get("fields", {})
-        prompt = safe_format(
-            load_prompt("classifier.txt"),
-            {
-                "summary": fields.get("summary", ""),
-                "description": fields.get("description", ""),
-            },
-        )
-        label = self.classifier.classify(prompt, **kwargs)
-        logger.debug("Classifier label: %s", label)
-        if str(label).upper().startswith("API"):
-            result = self.validator.validate(issue, **kwargs)
-            self.shared_context.validation_result = result
-            return result
-        return "Issue not API related"
 
     def _handle_validation_result(self, issue_id: str, result: str) -> bool:
         """Post validation results to Jira if a comment is present.
@@ -573,36 +525,17 @@ class RouterAgent:
     def _basic_routing(self, question: str, **kwargs: Any) -> str:
         issue_id = self._extract_issue_id(question) or self.session_memory.current_issue
         try:
-            intent = self._classify_intent(question, **kwargs)
-            if intent.startswith("OPERATE"):
-                plan = self.planner.generate_plan(question, {"issue_key": issue_id or ""}, **kwargs)
-                if plan.get("plan"):
-                    results = self._execute_operations_plan(plan, **kwargs)
-                    summary = []
-                    for i in range(1, len(results) + 1):
-                        step_key = f"step_{i}"
-                        res = results.get(step_key)
-                        summary.append(f"{step_key}: {res}")
-                    return "\n".join(summary)
-                return self.operations.operate(question, issue_id=issue_id, **kwargs)
-            if intent.startswith("CREATE"):
-                project_key = self._extract_project_key(question) or (self.config.projects[0] if self.config.projects else None)
-                if not project_key:
-                    return "Please specify a Jira project key"
-                return self.creator.create_issue(question, project_key, **kwargs)
-            if not issue_id:
-                return (
-                    "I'm sorry, I didn't catch an issue key in your question. "
-                    "Could you specify which Jira issue you mean?"
-                )
-            if intent.startswith("VALIDATE"):
-                result = self._classify_and_validate(issue_id, **kwargs)
-                if self._handle_validation_result(issue_id, result):
-                    result += "\n\nValidation summary posted as a Jira comment."
-                return result
-            if intent.startswith("TEST"):
-                return self._generate_tests(issue_id, question, **kwargs)
-            return self.insights.ask(issue_id, question, **kwargs)
+            plan = self.planner.generate_plan(question, {"issue_key": issue_id or ""}, **kwargs)
+            if not plan.get("plan"):
+                return "I'm sorry, I couldn't generate a plan for your request."
+
+            results = self._execute_operations_plan(plan, **kwargs)
+            summary = []
+            for i in range(1, len(results) + 1):
+                step_key = f"step_{i}"
+                res = results.get(step_key)
+                summary.append(f"{step_key}: {res}")
+            return "\n".join(summary)
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
             return f"Sorry, I couldn't find the Jira issue {issue_id}. Please check the key and try again."

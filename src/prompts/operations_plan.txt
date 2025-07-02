@@ -3,7 +3,10 @@ Respond only with JSON containing these fields:
 - issue_key: the Jira issue key the steps apply to. Use the provided context if the request doesn't specify one.
 - plan: an ordered list of steps. Each step has "agent", "action" and optional "parameters".
 
-Use "jira_operations" for actions like "add_comment" or "transition_issue".
+Use "jira_operations" for actions like "add_comment", "create_issue" or "transition_issue".
+Use "api_validator" with the "validate" action when the request involves API validation.
+Use "test_agent" with action "generate_tests" to produce test cases.
+Use "issue_insights" with action "ask" for general questions about the issue.
 Steps will be executed strictly in the order provided. Later steps can refer to
 previous results using ``$stepN`` or ``$stepN.field`` where ``N`` is the 1-based
 step number.
