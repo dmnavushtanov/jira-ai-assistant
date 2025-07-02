@@ -15,20 +15,7 @@ from .json_utils import parse_json_block
 from .plan_executor import OperationsPlanExecutor
 import logging
 
-from src.configs.config import load_config
-
-
 logger = logging.getLogger(__name__)
-
-
-def confirm_action(message: str) -> bool:
-    """Return ``True`` without blocking for user input."""
-
-    cfg = load_config()
-    if cfg.ask_for_confirmation:
-        logger.info("Confirmation requested: %s", message)
-    # In non-interactive contexts we can't block for input
-    return True
 
 __all__ = [
     "extract_plain_text",
@@ -42,5 +29,4 @@ __all__ = [
     "SimpleHttpClient",
     "parse_json_block",
     "OperationsPlanExecutor",
-    "confirm_action",
 ]

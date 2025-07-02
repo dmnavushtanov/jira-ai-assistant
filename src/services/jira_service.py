@@ -74,11 +74,6 @@ def create_jira_issue_func(
     logger.debug(
         "Creating Jira issue in project %s with summary %s", project_key, summary
     )
-    from src.utils import confirm_action
-
-    if not confirm_action(f"Create issue in {project_key} with summary '{summary}'?"):
-        logger.info("User declined to create issue in %s", project_key)
-        return "Creation cancelled by user"
     client = _get_jira_client()
     fields: Dict[str, Any] = {
         "project": {"key": project_key},
@@ -209,11 +204,6 @@ get_issue_transitions_tool = Tool(
 def add_comment_to_issue_func(issue_id: str, comment: str) -> str:
     """Add a comment to the specified issue."""
     logger.debug("Adding comment to issue %s", issue_id)
-    from src.utils import confirm_action
-
-    if not confirm_action(f"Add the proposed comment to {issue_id}?"):
-        logger.info("User declined to add comment to %s", issue_id)
-        return "Comment creation cancelled by user"
     client = _get_jira_client()
     result = client.add_comment(issue_id, comment)
     cfg = load_config()
@@ -264,11 +254,6 @@ def update_issue_fields_func(issue_id: str, fields_json: str) -> str:
     ``fields_json`` should be a JSON string mapping field names to new values.
     """
     logger.debug("Updating issue %s with fields %s", issue_id, fields_json)
-    from src.utils import confirm_action
-
-    if not confirm_action(f"Apply the provided updates to {issue_id}?"):
-        logger.info("User declined to update %s", issue_id)
-        return "Update cancelled by user"
     client = _get_jira_client()
     fields: Dict[str, Any] = json.loads(fields_json)
     updated = client.update_issue(issue_id, fields)
@@ -282,11 +267,6 @@ def update_issue_fields_func(issue_id: str, fields_json: str) -> str:
 def fill_field_by_label_func(issue_id: str, field_label: str, value: str) -> str:
     """Update an issue field using its display label."""
     logger.debug("Filling field %s on %s with value %s", field_label, issue_id, value)
-    from src.utils import confirm_action
-
-    if not confirm_action(f"Set '{field_label}' on {issue_id} to '{value}'?"):
-        logger.info("User declined to update %s", issue_id)
-        return "Field update cancelled by user"
     client = _get_jira_client()
     updated = client.set_field_by_label(issue_id, field_label, value)
     cfg = load_config()
@@ -349,11 +329,6 @@ update_issue_fields_tool = Tool(
 def transition_issue_func(issue_id: str, transition: str) -> str:
     """Move ``issue_id`` to the specified workflow state."""
     logger.debug("Transitioning %s using %s", issue_id, transition)
-    from src.utils import confirm_action
-
-    if not confirm_action(f"Transition {issue_id} using '{transition}'?"):
-        logger.info("User declined to transition %s", issue_id)
-        return "Transition cancelled by user"
     client = _get_jira_client()
     updated = client.transition_issue(issue_id, transition)
     cfg = load_config()

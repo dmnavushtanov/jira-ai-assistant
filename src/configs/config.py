@@ -36,7 +36,6 @@ class Config:
     strip_unused_jira_data: bool
     follow_related_jiras: bool
     write_comments_to_jira: bool
-    ask_for_confirmation: bool
     log_jira_payloads: bool
     validation_prompts_dir: str = "validation"
 
@@ -146,9 +145,6 @@ def load_config(path: str = None) -> Config:
         ),
         write_comments_to_jira=_env_bool(
             "WRITE_COMMENTS_TO_JIRA", data.get("write_comments_to_jira", False)
-        ),
-        ask_for_confirmation=_env_bool(
-            "ASK_FOR_CONFIRMATION", data.get("ask_for_confirmation", False)
         ),
         log_jira_payloads=_env_bool(
             "LOG_JIRA_PAYLOADS", data.get("log_jira_payloads", True)
