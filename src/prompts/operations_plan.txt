@@ -4,6 +4,9 @@ Respond only with JSON containing these fields:
 - plan: an ordered list of steps. Each step has "agent", "action" and optional "parameters".
 
 Use "jira_operations" for actions like "add_comment" or "transition_issue".
+Steps will be executed strictly in the order provided. Later steps can refer to
+previous results using ``$stepN`` or ``$stepN.field`` where ``N`` is the 1-based
+step number.
 - For "transition_issue", the "parameters" must include a "transition_name" key with the target status from the user request.
 - For "add_comment", the "parameters" must include a "comment" key with the comment text.
 
