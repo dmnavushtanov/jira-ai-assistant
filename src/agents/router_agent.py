@@ -53,13 +53,14 @@ class RouterAgent:
     def __init__(self, config_path: str | None = None) -> None:
         logger.debug("Initializing RouterAgent with config_path=%s", config_path)
         self.config = load_config(config_path)
-        self.classifier = ClassifierAgent(config_path)
-        self.validator = ApiValidatorAgent(config_path)
-        self.insights = IssueInsightsAgent(config_path)
-        self.operations = JiraOperationsAgent(config_path)
-        self.tester = TestAgent(config_path)
-        self.creator = IssueCreatorAgent(config_path)
-        self.planner = PlanningAgent(config_path)
+        self.session_memory = JiraContextMemory()
+        self.classifier = ClassifierAgent(config_path, memory=self.session_memory)
+        self.validator = ApiValidatorAgent(config_path, memory=self.session_memory)
+        self.insights = IssueInsightsAgent(config_path, memory=self.session_memory)
+        self.operations = JiraOperationsAgent(config_path, memory=self.session_memory)
+        self.tester = TestAgent(config_path, memory=self.session_memory)
+        self.creator = IssueCreatorAgent(config_path, memory=self.session_memory)
+        self.planner = PlanningAgent(config_path, memory=self.session_memory)
         self.plan_executor = OperationsPlanExecutor(self.operations)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
@@ -75,7 +76,6 @@ class RouterAgent:
                 logger.warning("LangChain not installed; conversation memory disabled")
             self.use_memory = False
             self.memory = None
-        self.session_memory = JiraContextMemory()
         if self.config.projects:
             pattern = "|".join(re.escape(p) for p in self.config.projects)
         else:

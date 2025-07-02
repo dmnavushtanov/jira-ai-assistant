@@ -15,7 +15,7 @@ import re
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client, create_langchain_llm
 from src.prompts import load_prompt
-from src.utils import safe_format
+from src.utils import safe_format, JiraContextMemory
 
 try:
     from langchain.chains import LLMChain, SequentialChain  # type: ignore
@@ -53,10 +53,15 @@ class TestAgent:
     other contextual information combined with the user's question.
     """
 
-    def __init__(self, config_path: str | None = None) -> None:
+    def __init__(
+        self,
+        config_path: str | None = None,
+        memory: Optional[JiraContextMemory] = None,
+    ) -> None:
         logger.debug("Initializing TestAgent with config_path=%s", config_path)
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
+        self.memory = memory
         self.prompts = {
             "GET": load_prompt("tests/get_test_cases.txt"),
             "POST": load_prompt("tests/post_test_cases.txt"),

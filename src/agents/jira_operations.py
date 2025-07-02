@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from src.services.jira_service import (
     add_comment_to_issue_tool,
@@ -18,7 +18,7 @@ from src.agents.issue_insights import IssueInsightsAgent
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
-from src.utils import safe_format, parse_json_block
+from src.utils import safe_format, parse_json_block, JiraContextMemory
 
 logger = logging.getLogger(__name__)
 logger.debug("jira_operations module loaded")
@@ -27,13 +27,18 @@ logger.debug("jira_operations module loaded")
 class JiraOperationsAgent:
     """Agent that performs modifications on Jira issues."""
 
-    def __init__(self, config_path: str | None = None) -> None:
+    def __init__(
+        self,
+        config_path: str | None = None,
+        memory: Optional[JiraContextMemory] = None,
+    ) -> None:
         logger.debug(
             "Initializing JiraOperationsAgent with config_path=%s", config_path
         )
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
-        self.insights = IssueInsightsAgent(config_path)
+        self.memory = memory
+        self.insights = IssueInsightsAgent(config_path, memory=memory)
 
         # Tools available to this agent
         self.tools = [
@@ -48,8 +53,20 @@ class JiraOperationsAgent:
         self.plan_prompt = load_prompt("jira_operations.txt")
         self.transition_prompt = load_prompt("transition_choice.txt")
 
-    def add_comment(self, issue_id: str, comment: str, **kwargs: Any) -> str:
+    def _default_issue_id(self, issue_id: str | None) -> str | None:
+        if issue_id:
+            return issue_id
+        if self.memory is not None:
+            return self.memory.current_issue
+        return None
+
+    def add_comment(
+        self, issue_id: str | None, comment: str, **kwargs: Any
+    ) -> str:
         """Add ``comment`` to ``issue_id`` using the Jira API."""
+        issue_id = self._default_issue_id(issue_id)
+        if not issue_id:
+            return "Missing issue_id for add_comment"
         logger.info("Adding comment to %s", issue_id)
         payload = json.dumps({"issue_id": issue_id, "comment": comment})
         result_json = add_comment_to_issue_tool.run(payload)
@@ -85,8 +102,13 @@ class JiraOperationsAgent:
             logger.debug("Failed to parse create_issue response")
             return result_json
 
-    def update_fields(self, issue_id: str, fields_json: str, **kwargs: Any) -> str:
+    def update_fields(
+        self, issue_id: str | None, fields_json: str, **kwargs: Any
+    ) -> str:
         """Update fields on ``issue_id``."""
+        issue_id = self._default_issue_id(issue_id)
+        if not issue_id:
+            return "Missing issue_id for update_fields"
         logger.info("Updating issue %s", issue_id)
         result_json = update_issue_fields_tool.run(issue_id, fields_json)
         try:
@@ -96,9 +118,12 @@ class JiraOperationsAgent:
             return result_json
 
     def fill_field_by_label(
-        self, issue_id: str, field_label: str, value: str, **kwargs: Any
+        self, issue_id: str | None, field_label: str, value: str, **kwargs: Any
     ) -> str:
         """Set an issue field value using the field's label."""
+        issue_id = self._default_issue_id(issue_id)
+        if not issue_id:
+            return "Missing issue_id for fill_field_by_label"
         logger.info("Setting %s on %s", field_label, issue_id)
         payload = json.dumps(
             {
@@ -114,8 +139,11 @@ class JiraOperationsAgent:
             logger.debug("Failed to parse fill_field_by_label response")
             return result_json
 
-    def get_issue_summary(self, issue_id: str, **kwargs: Any) -> str:
+    def get_issue_summary(self, issue_id: str | None, **kwargs: Any) -> str:
         """Return a short summary for ``issue_id`` using the insights agent."""
+        issue_id = self._default_issue_id(issue_id)
+        if not issue_id:
+            return "Missing issue_id for get_issue_summary"
         logger.info("Fetching summary for %s", issue_id)
         try:
             return self.insights.summarize(issue_id, **kwargs)
@@ -157,7 +185,7 @@ class JiraOperationsAgent:
 
     def transition_issue(
         self,
-        issue_id: str,
+        issue_id: str | None,
         transition: str | None = None,
         **kwargs: Any,
     ) -> str:
@@ -174,6 +202,10 @@ class JiraOperationsAgent:
         the issue is not transitioned automatically when the requested status is
         unavailable.
         """
+
+        issue_id = self._default_issue_id(issue_id)
+        if not issue_id:
+            raise TypeError("transition_issue requires an issue_id")
 
         if transition is None:
             transition = kwargs.pop("transition_name", None)
@@ -237,8 +269,11 @@ class JiraOperationsAgent:
             logger.debug("Failed to parse transition_issue response")
             return result_json
 
-    def get_issue_summary(self, issue_id: str, **kwargs: Any) -> str:
+    def get_issue_summary(self, issue_id: str | None, **kwargs: Any) -> str:
         """Return a short summary for ``issue_id``."""
+        issue_id = self._default_issue_id(issue_id)
+        if not issue_id:
+            return "Missing issue_id for get_issue_summary"
         logger.info("Summarizing issue %s", issue_id)
         return self.insights.summarize(issue_id, **kwargs)
 
@@ -251,6 +286,7 @@ class JiraOperationsAgent:
         """Return an action plan dict for ``question`` using the LLM."""
         if not self.plan_prompt:
             raise RuntimeError("Jira operations prompt not found")
+        issue_id = self._default_issue_id(issue_id)
         template = self.plan_prompt
         prompt = safe_format(
             template, {"question": question, "issue_id": issue_id or ""}
@@ -279,15 +315,16 @@ class JiraOperationsAgent:
         self, question: str, issue_id: str | None = None, history: str = "", **kwargs: Any
     ) -> str:
         """Execute an operation described by ``question``."""
+        issue_id = self._default_issue_id(issue_id)
         plan = self._plan_operation(question, issue_id=issue_id, history=history, **kwargs)
         action = str(plan.get("action", "unknown")).lower()
         try:
             if action == "add_comment":
-                issue = plan.get("issue_id") or issue_id
+                issue = self._default_issue_id(plan.get("issue_id") or issue_id)
                 comment = plan.get("comment")
                 if not issue or not comment:
                     return "Missing issue_id or comment for add_comment"
-                result = self.add_comment(str(issue), str(comment), **kwargs)
+                result = self.add_comment(issue, str(comment), **kwargs)
                 return self._format_result(result)
             if action == "create_issue":
                 summary = plan.get("summary")
@@ -305,41 +342,41 @@ class JiraOperationsAgent:
                 )
                 return self._format_result(result)
             if action == "update_fields":
-                issue = plan.get("issue_id") or issue_id
+                issue = self._default_issue_id(plan.get("issue_id") or issue_id)
                 fields = plan.get("fields")
                 if not issue or not fields:
                     return "Missing issue_id or fields for update_fields"
                 fields_json = json.dumps(fields)
-                result = self.update_fields(str(issue), fields_json, **kwargs)
+                result = self.update_fields(issue, fields_json, **kwargs)
                 return self._format_result(result)
             if action == "fill_field_by_label":
-                issue = plan.get("issue_id") or issue_id
+                issue = self._default_issue_id(plan.get("issue_id") or issue_id)
                 label = plan.get("field_label")
                 value = plan.get("value")
                 if not issue or not label:
                     return "Missing issue_id or field_label for fill_field_by_label"
                 result = self.fill_field_by_label(
-                    str(issue), str(label), str(value), **kwargs
+                    issue, str(label), str(value), **kwargs
                 )
                 return self._format_result(result)
             if action == "get_issue_summary":
-                issue = plan.get("issue_id") or issue_id
+                issue = self._default_issue_id(plan.get("issue_id") or issue_id)
                 if not issue:
                     return "Missing issue_id for get_issue_summary"
-                result = self.get_issue_summary(str(issue), **kwargs)
+                result = self.get_issue_summary(issue, **kwargs)
                 return self._format_result(result)
             if action == "transition_issue":
-                issue = plan.get("issue_id") or issue_id
+                issue = self._default_issue_id(plan.get("issue_id") or issue_id)
                 transition = plan.get("transition")
                 if not issue or not transition:
                     return "Missing issue_id or transition for transition_issue"
-                result = self.transition_issue(str(issue), str(transition), **kwargs)
+                result = self.transition_issue(issue, str(transition), **kwargs)
                 return self._format_result(result)
             if action == "get_issue_summary":
-                issue = plan.get("issue_id") or issue_id
+                issue = self._default_issue_id(plan.get("issue_id") or issue_id)
                 if not issue:
                     return "Missing issue_id for get_issue_summary"
-                result = self.get_issue_summary(str(issue), **kwargs)
+                result = self.get_issue_summary(issue, **kwargs)
                 return self._format_result(result)
         except Exception:
             logger.exception("Failed to execute operation")

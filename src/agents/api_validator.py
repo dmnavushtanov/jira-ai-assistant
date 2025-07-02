@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pathlib import Path
 
 from src.prompts import load_prompt, PROMPTS_DIR
-from src.utils import extract_plain_text, safe_format
+from src.utils import extract_plain_text, safe_format, JiraContextMemory
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 
@@ -37,10 +37,17 @@ def _load_status_prompts(directory: str) -> Dict[str, str]:
 class ApiValidatorAgent:
     """Agent that validates Jira issues based on their status."""
 
-    def __init__(self, config_path: str | None = None) -> None:
-        logger.debug("Initializing ApiValidatorAgent with config_path=%s", config_path)
+    def __init__(
+        self,
+        config_path: str | None = None,
+        memory: Optional[JiraContextMemory] = None,
+    ) -> None:
+        logger.debug(
+            "Initializing ApiValidatorAgent with config_path=%s", config_path
+        )
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
+        self.memory = memory
 
         self.prompts = _load_status_prompts(self.config.validation_prompts_dir)
         self.general_prompt = load_prompt(
