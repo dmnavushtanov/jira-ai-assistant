@@ -190,14 +190,6 @@ class RouterAgent:
     # ------------------------------------------------------------------
     # Tooling helpers
     # ------------------------------------------------------------------
-    def _parse_tool_input(self, input_str: str) -> Dict[str, str]:
-        """Parse tool input in format 'key:value|key:value'."""
-        parts: Dict[str, str] = {}
-        for part in input_str.split("|"):
-            if ":" in part:
-                key, value = part.split(":", 1)
-                parts[key.strip()] = value.strip()
-        return parts
 
     def _create_tools(self) -> List["BaseTool"]: # type: ignore
         if Tool is None:
