@@ -120,8 +120,8 @@ result = creator.create_issue(
 print(result)
 ```
 
-When used with the `RouterAgent` any request starting with "create" is
-classified with the `CREATE` intent and routed through this agent.
+When used with the `RouterAgent` a request to create an issue automatically
+invokes this agent through the planning pipeline.
 
 ### Multi-step Operations
 
