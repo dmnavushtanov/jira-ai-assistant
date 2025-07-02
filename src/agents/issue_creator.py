@@ -10,6 +10,7 @@ from src.agents.jira_operations import JiraOperationsAgent
 from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.prompts import load_prompt
+from src.models import SharedContext
 from src.utils import safe_format, parse_json_block, JiraContextMemory
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class IssueCreatorAgent:
         self,
         config_path: str | None = None,
         memory: Optional[JiraContextMemory] = None,
+        context: Optional[SharedContext] = None,
     ) -> None:
         logger.debug(
             "Initializing IssueCreatorAgent with config_path=%s", config_path
@@ -30,7 +32,10 @@ class IssueCreatorAgent:
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
         self.memory = memory
-        self.operations = JiraOperationsAgent(config_path, memory=memory)
+        self.context = context
+        self.operations = JiraOperationsAgent(
+            config_path, memory=memory, context=context
+        )
         self.plan_prompt = load_prompt("issue_plan.txt")
 
     def plan_issue(self, request: str, history: str = "", **kwargs: Any) -> dict[str, Any]:

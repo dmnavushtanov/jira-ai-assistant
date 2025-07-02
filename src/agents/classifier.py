@@ -7,6 +7,7 @@ from src.configs.config import load_config
 from src.llm_clients import create_llm_client
 from src.services.jira_service import get_issue_by_id_tool
 from src.utils import JiraContextMemory
+from src.models import SharedContext
 
 logger = logging.getLogger(__name__)
 logger.debug("classifier module loaded")
@@ -19,6 +20,7 @@ class ClassifierAgent:
         self,
         config_path: str | None = None,
         memory: Optional[JiraContextMemory] = None,
+        context: Optional[SharedContext] = None,
     ) -> None:
         logger.debug(
             "Initializing ClassifierAgent with config_path=%s", config_path
@@ -26,6 +28,7 @@ class ClassifierAgent:
         self.config = load_config(config_path)
         self.client = create_llm_client(config_path)
         self.memory = memory
+        self.context = context
 
         # Tools available to this agent
         self.tools = [get_issue_by_id_tool]

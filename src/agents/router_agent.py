@@ -23,6 +23,7 @@ except Exception:  # pragma: no cover - optional dependency
 
 from ..configs.config import load_config
 from ..llm_clients import create_langchain_llm
+from ..models import SharedContext
 from .classifier import ClassifierAgent
 from .issue_insights import IssueInsightsAgent
 from .api_validator import ApiValidatorAgent
@@ -54,13 +55,32 @@ class RouterAgent:
         logger.debug("Initializing RouterAgent with config_path=%s", config_path)
         self.config = load_config(config_path)
         self.session_memory = JiraContextMemory()
-        self.classifier = ClassifierAgent(config_path, memory=self.session_memory)
-        self.validator = ApiValidatorAgent(config_path, memory=self.session_memory)
-        self.insights = IssueInsightsAgent(config_path, memory=self.session_memory)
-        self.operations = JiraOperationsAgent(config_path, memory=self.session_memory)
-        self.tester = TestAgent(config_path, memory=self.session_memory)
-        self.creator = IssueCreatorAgent(config_path, memory=self.session_memory)
-        self.planner = PlanningAgent(config_path, memory=self.session_memory)
+        self.shared_context = SharedContext()
+        self.classifier = ClassifierAgent(
+            config_path, memory=self.session_memory, context=self.shared_context
+        )
+        self.validator = ApiValidatorAgent(
+            config_path,
+            memory=self.session_memory,
+            context=self.shared_context,
+        )
+        self.insights = IssueInsightsAgent(
+            config_path, memory=self.session_memory, context=self.shared_context
+        )
+        self.operations = JiraOperationsAgent(
+            config_path,
+            memory=self.session_memory,
+            context=self.shared_context,
+        )
+        self.tester = TestAgent(
+            config_path, memory=self.session_memory, context=self.shared_context
+        )
+        self.creator = IssueCreatorAgent(
+            config_path, memory=self.session_memory, context=self.shared_context
+        )
+        self.planner = PlanningAgent(
+            config_path, memory=self.session_memory, context=self.shared_context
+        )
         self.plan_executor = OperationsPlanExecutor(self.operations)
         self.use_memory = self.config.conversation_memory
         self.max_history = self.config.max_questions_to_remember
@@ -405,7 +425,9 @@ class RouterAgent:
         label = self.classifier.classify(prompt, **kwargs)
         logger.debug("Classifier label: %s", label)
         if str(label).upper().startswith("API"):
-            return self.validator.validate(issue, **kwargs)
+            result = self.validator.validate(issue, **kwargs)
+            self.shared_context.validation_result = result
+            return result
         return "Issue not API related"
 
     def _handle_validation_result(self, issue_id: str, result: str) -> bool:
@@ -459,7 +481,10 @@ class RouterAgent:
             summary = fields.get("summary", "") or ""
             description = fields.get("description", "") or ""
             text = f"{summary}\n{description}\n{question}"
+            if self.shared_context.validation_result:
+                text = f"{self.shared_context.validation_result}\n{text}"
             tests = self.tester.create_test_cases(text, None, **kwargs)
+            self.shared_context.generated_tests = tests
             return tests
         except JIRAError:
             logger.exception("Jira error while fetching issue %s", issue_id)
@@ -486,7 +511,9 @@ class RouterAgent:
 
     def _generate_tests(self, issue_id: str, question: str, **kwargs: Any) -> str:
         """Return generated test cases and update Jira when possible."""
-        tests = self._generate_test_cases(issue_id, question, **kwargs)
+        tests = self.shared_context.generated_tests
+        if not tests:
+            tests = self._generate_test_cases(issue_id, question, **kwargs)
 
         if tests is None or tests == EXISTING_TESTS_MSG:
             return EXISTING_TESTS_MSG
@@ -495,6 +522,7 @@ class RouterAgent:
         if cleaned and not cleaned.lower().startswith("not enough"):
             if self._add_tests_to_description(issue_id, cleaned):
                 cleaned += "\n\nDescription updated with generated tests."
+        self.shared_context.generated_tests = cleaned
         return cleaned
 
     def _execute_operations_plan(self, plan: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
@@ -508,7 +536,9 @@ class RouterAgent:
                 )
             }
 
-        return self.plan_executor.execute(plan, issue_key, **kwargs)
+        results = self.plan_executor.execute(plan, issue_key, **kwargs)
+        self.shared_context.operation_outcome = results
+        return results
 
     # ------------------------------------------------------------------
     # Public API
